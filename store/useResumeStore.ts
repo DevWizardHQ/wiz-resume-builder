@@ -15,19 +15,20 @@ import {
   sortExperiencesByDate,
   sortInvolvementsByDate,
   sortProjectsByDate,
+  sortPublicationsByDate,
 } from '@/lib/utils/date-sorter';
 
-const MAX_HISTORY_STEPS = 30;
-const AUTO_SAVE_DEBOUNCE_MS = 1500;
+export const MAX_HISTORY_STEPS = 30;
+export const AUTO_SAVE_DEBOUNCE_MS = 1500;
 
-interface ResumeHistoryState {
+export interface ResumeHistoryState {
   data: ResumeData;
   sectionOrder: SectionKey[];
   templateId: TemplateId;
   title: string;
 }
 
-interface ResumeStoreState {
+export interface ResumeStoreState {
   // Resume Metadata & Content
   resumeId: string | null;
   title: string;
@@ -137,7 +138,7 @@ export const useResumeStore = create<ResumeStoreState>((set, get) => {
     slug: 'untitled-resume',
     templateId: 'classic-ats',
     sectionOrder: DEFAULT_SECTION_ORDER,
-    data: INITIAL_RESUME_DATA,
+    data: JSON.parse(JSON.stringify(INITIAL_RESUME_DATA)),
     atsScore: 0,
 
     isSaving: false,
@@ -150,15 +151,24 @@ export const useResumeStore = create<ResumeStoreState>((set, get) => {
     saveTimeoutId: null,
 
     loadResume: (resume) => {
+      const state = get();
+      if (state.saveTimeoutId) {
+        clearTimeout(state.saveTimeoutId);
+      }
       set({
         resumeId: resume.id || null,
         title: resume.title || 'Untitled Resume',
         slug: resume.slug || 'untitled-resume',
         templateId: (resume.template_id as TemplateId) || 'classic-ats',
         sectionOrder: resume.section_order?.length
-          ? resume.section_order
-          : DEFAULT_SECTION_ORDER,
-        data: resume.content ? { ...INITIAL_RESUME_DATA, ...resume.content } : INITIAL_RESUME_DATA,
+          ? [...resume.section_order]
+          : [...DEFAULT_SECTION_ORDER],
+        data: resume.content
+          ? {
+              ...JSON.parse(JSON.stringify(INITIAL_RESUME_DATA)),
+              ...JSON.parse(JSON.stringify(resume.content)),
+            }
+          : JSON.parse(JSON.stringify(INITIAL_RESUME_DATA)),
         atsScore: resume.ats_score ?? 0,
         isDirty: false,
         isSaving: false,
@@ -166,17 +176,22 @@ export const useResumeStore = create<ResumeStoreState>((set, get) => {
         lastSaved: resume.updated_at || new Date().toISOString(),
         past: [],
         future: [],
+        saveTimeoutId: null,
       });
     },
 
     resetResume: () => {
+      const state = get();
+      if (state.saveTimeoutId) {
+        clearTimeout(state.saveTimeoutId);
+      }
       set({
         resumeId: null,
         title: 'Untitled Resume',
         slug: 'untitled-resume',
         templateId: 'classic-ats',
-        sectionOrder: DEFAULT_SECTION_ORDER,
-        data: INITIAL_RESUME_DATA,
+        sectionOrder: [...DEFAULT_SECTION_ORDER],
+        data: JSON.parse(JSON.stringify(INITIAL_RESUME_DATA)),
         atsScore: 0,
         isDirty: false,
         isSaving: false,
@@ -184,6 +199,7 @@ export const useResumeStore = create<ResumeStoreState>((set, get) => {
         lastSaved: null,
         past: [],
         future: [],
+        saveTimeoutId: null,
       });
     },
 
@@ -211,12 +227,13 @@ export const useResumeStore = create<ResumeStoreState>((set, get) => {
     setSectionOrder: (sectionOrder) => {
       set((state) => ({
         ...snapshot(state),
-        sectionOrder,
+        sectionOrder: [...sectionOrder],
       }));
       scheduleSave();
     },
 
     moveSection: (activeKey, overKey) => {
+      let changed = false;
       set((state) => {
         const order = [...state.sectionOrder];
         const oldIndex = order.indexOf(activeKey);
@@ -227,13 +244,16 @@ export const useResumeStore = create<ResumeStoreState>((set, get) => {
 
         const [removed] = order.splice(oldIndex, 1);
         order.splice(newIndex, 0, removed);
+        changed = true;
 
         return {
           ...snapshot(state),
           sectionOrder: order,
         };
       });
-      scheduleSave();
+      if (changed) {
+        scheduleSave();
+      }
     },
 
     updateContact: (contactUpdates) => {
@@ -265,6 +285,7 @@ export const useResumeStore = create<ResumeStoreState>((set, get) => {
     },
 
     addItem: (section, item) => {
+      let added = false;
       set((state) => {
         const currentList = state.data[section] as unknown as any[];
         if (!Array.isArray(currentList)) return state;
@@ -275,6 +296,7 @@ export const useResumeStore = create<ResumeStoreState>((set, get) => {
           order: currentList.length,
           visible: itemObj.visible ?? true,
         };
+        added = true;
 
         return {
           ...snapshot(state),
@@ -284,17 +306,24 @@ export const useResumeStore = create<ResumeStoreState>((set, get) => {
           },
         };
       });
-      scheduleSave();
+      if (added) {
+        scheduleSave();
+      }
     },
 
     updateItem: (section, id, updates) => {
+      let updated = false;
       set((state) => {
         const currentList = state.data[section] as unknown as any[];
         if (!Array.isArray(currentList)) return state;
 
+        const exists = currentList.some((item) => item.id === id);
+        if (!exists) return state;
+
         const updatedList = currentList.map((item) =>
           item.id === id ? { ...item, ...updates } : item
         );
+        updated = true;
 
         return {
           ...snapshot(state),
@@ -304,17 +333,24 @@ export const useResumeStore = create<ResumeStoreState>((set, get) => {
           },
         };
       });
-      scheduleSave();
+      if (updated) {
+        scheduleSave();
+      }
     },
 
     removeItem: (section, id) => {
+      let removed = false;
       set((state) => {
         const currentList = state.data[section] as unknown as any[];
         if (!Array.isArray(currentList)) return state;
 
+        const exists = currentList.some((item) => item.id === id);
+        if (!exists) return state;
+
         const filtered = currentList
           .filter((item) => item.id !== id)
           .map((item, idx) => ({ ...item, order: idx }));
+        removed = true;
 
         return {
           ...snapshot(state),
@@ -324,17 +360,24 @@ export const useResumeStore = create<ResumeStoreState>((set, get) => {
           },
         };
       });
-      scheduleSave();
+      if (removed) {
+        scheduleSave();
+      }
     },
 
     toggleItemVisibility: (section, id) => {
+      let toggled = false;
       set((state) => {
         const currentList = state.data[section] as unknown as any[];
         if (!Array.isArray(currentList)) return state;
 
+        const exists = currentList.some((item) => item.id === id);
+        if (!exists) return state;
+
         const updatedList = currentList.map((item) =>
           item.id === id ? { ...item, visible: !item.visible } : item
         );
+        toggled = true;
 
         return {
           ...snapshot(state),
@@ -344,10 +387,13 @@ export const useResumeStore = create<ResumeStoreState>((set, get) => {
           },
         };
       });
-      scheduleSave();
+      if (toggled) {
+        scheduleSave();
+      }
     },
 
     reorderItems: (section, activeId, overId) => {
+      let reordered = false;
       set((state) => {
         const currentList = state.data[section] as unknown as any[];
         if (!Array.isArray(currentList)) return state;
@@ -363,6 +409,7 @@ export const useResumeStore = create<ResumeStoreState>((set, get) => {
         items.splice(newIndex, 0, moved);
 
         const reindexed = items.map((item, idx) => ({ ...item, order: idx }));
+        reordered = true;
 
         return {
           ...snapshot(state),
@@ -372,10 +419,13 @@ export const useResumeStore = create<ResumeStoreState>((set, get) => {
           },
         };
       });
-      scheduleSave();
+      if (reordered) {
+        scheduleSave();
+      }
     },
 
     sortSectionByDate: (section) => {
+      let sortedOccurred = false;
       set((state) => {
         let sorted: any[] = [];
         switch (section) {
@@ -397,10 +447,14 @@ export const useResumeStore = create<ResumeStoreState>((set, get) => {
           case 'awards':
             sorted = sortAwardsByDate(state.data.awards);
             break;
+          case 'publications':
+            sorted = sortPublicationsByDate(state.data.publications);
+            break;
           default:
             return state;
         }
 
+        sortedOccurred = true;
         return {
           ...snapshot(state),
           data: {
@@ -409,10 +463,13 @@ export const useResumeStore = create<ResumeStoreState>((set, get) => {
           },
         };
       });
-      scheduleSave();
+      if (sortedOccurred) {
+        scheduleSave();
+      }
     },
 
     undo: () => {
+      let canUndo = false;
       set((state) => {
         if (state.past.length === 0) return state;
 
@@ -426,20 +483,24 @@ export const useResumeStore = create<ResumeStoreState>((set, get) => {
           title: state.title,
         };
 
+        canUndo = true;
         return {
           past: newPast,
           future: [current, ...state.future].slice(0, MAX_HISTORY_STEPS),
-          data: previous.data,
-          sectionOrder: previous.sectionOrder,
+          data: JSON.parse(JSON.stringify(previous.data)),
+          sectionOrder: [...previous.sectionOrder],
           templateId: previous.templateId,
           title: previous.title,
           isDirty: true,
         };
       });
-      scheduleSave();
+      if (canUndo) {
+        scheduleSave();
+      }
     },
 
     redo: () => {
+      let canRedo = false;
       set((state) => {
         if (state.future.length === 0) return state;
 
@@ -453,17 +514,20 @@ export const useResumeStore = create<ResumeStoreState>((set, get) => {
           title: state.title,
         };
 
+        canRedo = true;
         return {
           past: [...state.past, current].slice(-MAX_HISTORY_STEPS),
           future: newFuture,
-          data: next.data,
-          sectionOrder: next.sectionOrder,
+          data: JSON.parse(JSON.stringify(next.data)),
+          sectionOrder: [...next.sectionOrder],
           templateId: next.templateId,
           title: next.title,
           isDirty: true,
         };
       });
-      scheduleSave();
+      if (canRedo) {
+        scheduleSave();
+      }
     },
 
     triggerAutoSave: () => {
@@ -473,6 +537,11 @@ export const useResumeStore = create<ResumeStoreState>((set, get) => {
     forceSave: async () => {
       const state = get();
       if (!state.resumeId || !state.isDirty) return;
+
+      if (state.saveTimeoutId) {
+        clearTimeout(state.saveTimeoutId);
+        set({ saveTimeoutId: null });
+      }
 
       set({ isSaving: true, saveError: null });
 
