@@ -269,10 +269,11 @@ export const useResumeStore = create<ResumeStoreState>((set, get) => {
         const currentList = state.data[section] as unknown as any[];
         if (!Array.isArray(currentList)) return state;
 
+        const itemObj = item as Record<string, any>;
         const newItem = {
-          ...item,
+          ...itemObj,
           order: currentList.length,
-          visible: item.visible ?? true,
+          visible: itemObj.visible ?? true,
         };
 
         return {
