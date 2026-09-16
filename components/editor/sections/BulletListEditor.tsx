@@ -1,15 +1,17 @@
 'use client';
 
 import React from 'react';
-import { ArrowDown, ArrowUp, Plus, Sparkles, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Plus, Sparkles, Trash2, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { AIBulletHelper } from '@/components/editor/AIBulletHelper';
 
 export interface BulletListEditorProps {
   bullets: string[];
   onChange: (bullets: string[]) => void;
   label?: string;
   placeholder?: string;
+  context?: string;
 }
 
 export const BulletListEditor: React.FC<BulletListEditorProps> = ({
@@ -17,6 +19,7 @@ export const BulletListEditor: React.FC<BulletListEditorProps> = ({
   onChange,
   label = 'Key Achievements & Responsibilities',
   placeholder = 'Accomplished [X], as measured by [Y], by doing [Z]...',
+  context = '',
 }) => {
   const handleAddBullet = () => {
     onChange([...bullets, '']);
@@ -43,6 +46,16 @@ export const BulletListEditor: React.FC<BulletListEditorProps> = ({
     onChange(updated);
   };
 
+  const handleApplyNewBullet = (newBullet: string) => {
+    const nonEmpty = bullets.filter((b) => b.trim().length > 0);
+    onChange([...nonEmpty, newBullet]);
+  };
+
+  const handleApplyMultipleBullets = (newBullets: string[]) => {
+    const nonEmpty = bullets.filter((b) => b.trim().length > 0);
+    onChange([...nonEmpty, ...newBullets]);
+  };
+
   return (
     <div className="space-y-2 pt-1">
       <div className="flex items-center justify-between">
@@ -52,33 +65,55 @@ export const BulletListEditor: React.FC<BulletListEditorProps> = ({
             ({bullets.length} {bullets.length === 1 ? 'bullet' : 'bullets'})
           </span>
         </label>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={handleAddBullet}
-          className="h-6 px-2 text-[11px] gap-1"
-        >
-          <Plus className="h-3 w-3" />
-          Add Bullet
-        </Button>
+        <div className="flex items-center gap-1.5">
+          <AIBulletHelper
+            context={context}
+            onApplyBullet={handleApplyNewBullet}
+            onApplyAllBullets={handleApplyMultipleBullets}
+            buttonLabel="AI Assistant"
+            buttonVariant="outline"
+            buttonSize="sm"
+            className="h-6 px-2 text-[11px]"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleAddBullet}
+            className="h-6 px-2 text-[11px] gap-1"
+          >
+            <Plus className="h-3 w-3" />
+            Add Bullet
+          </Button>
+        </div>
       </div>
 
       {bullets.length === 0 ? (
         <div className="rounded-md border border-dashed p-3 text-center">
-          <p className="text-xs text-muted-foreground mb-1.5">
+          <p className="text-xs text-muted-foreground mb-2">
             No bullet points added yet.
           </p>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={handleAddBullet}
-            className="h-7 text-xs"
-          >
-            <Plus className="h-3 w-3 mr-1" />
-            Add First Bullet Point
-          </Button>
+          <div className="flex items-center justify-center gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={handleAddBullet}
+              className="h-7 text-xs"
+            >
+              <Plus className="h-3 w-3 mr-1" />
+              Add First Bullet
+            </Button>
+            <AIBulletHelper
+              context={context}
+              onApplyBullet={handleApplyNewBullet}
+              onApplyAllBullets={handleApplyMultipleBullets}
+              buttonLabel="Draft with AI"
+              buttonVariant="default"
+              buttonSize="sm"
+              className="h-7 text-xs"
+            />
+          </div>
         </div>
       ) : (
         <div className="space-y-2">
@@ -98,6 +133,22 @@ export const BulletListEditor: React.FC<BulletListEditorProps> = ({
                 className="min-h-[44px] text-xs resize-y border-0 focus-visible:ring-0 p-1 bg-transparent"
               />
               <div className="flex flex-col gap-0.5 shrink-0 pt-0.5 opacity-80 group-hover/bullet:opacity-100">
+                <AIBulletHelper
+                  initialText={bullet}
+                  context={context}
+                  onApplyBullet={(optimized) => handleUpdateBullet(index, optimized)}
+                  trigger={
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="h-5 w-5 text-amber-500 hover:text-amber-600 hover:bg-amber-500/10"
+                      title="Optimize bullet with AI (Google X-Y-Z formula)"
+                    >
+                      <Sparkles className="h-3 w-3" />
+                    </Button>
+                  }
+                />
                 <Button
                   type="button"
                   variant="ghost"

@@ -232,6 +232,17 @@ export const ProjectsSection: React.FC = () => {
                   {/* Bullet Points */}
                   <BulletListEditor
                     bullets={proj.bullets || []}
+                    context={
+                      [
+                        proj.name,
+                        proj.role ? `(${proj.role})` : '',
+                        proj.technologies && proj.technologies.length > 0
+                          ? `built with ${proj.technologies.join(', ')}`
+                          : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ') || undefined
+                    }
                     onChange={(bullets) =>
                       updateItem('projects', proj.id, { bullets })
                     }

@@ -231,6 +231,11 @@ export const ExperienceSection: React.FC = () => {
                   {/* Bullet Points */}
                   <BulletListEditor
                     bullets={exp.bullets || []}
+                    context={
+                      [exp.role, exp.company ? `at ${exp.company}` : '']
+                        .filter(Boolean)
+                        .join(' ') || undefined
+                    }
                     onChange={(bullets) =>
                       updateItem('experience', exp.id, { bullets })
                     }

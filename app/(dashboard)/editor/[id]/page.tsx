@@ -19,6 +19,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { AIReviewDrawer } from '@/components/editor/AIReviewDrawer';
 import { EditorSidebar } from '@/components/editor/EditorSidebar';
 import { LivePreviewPane } from '@/components/editor/LivePreviewPane';
 import { createClient } from '@/lib/supabase/client';
@@ -294,10 +295,18 @@ export default function EditorPage({ params }: EditorPageProps) {
 
         {/* Right: ATS Score & Mobile View Toggle */}
         <div className="flex items-center gap-2">
-          {/* ATS Score */}
-          <div title="Calculated ATS optimization score based on section completeness, action verbs, and structure">
-            {getScoreBadge(atsScore)}
-          </div>
+          {/* ATS Review Drawer Trigger */}
+          <AIReviewDrawer
+            trigger={
+              <button
+                type="button"
+                className="cursor-pointer transition-transform hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-primary/40 rounded-full"
+                title="Click to open ATS Audit, Format Checklist, and Keyword Match Drawer"
+              >
+                {getScoreBadge(atsScore)}
+              </button>
+            }
+          />
 
           {/* Mobile View Toggle (Tabs) */}
           <div className="flex lg:hidden items-center bg-muted p-0.5 rounded-lg border border-border/50">
