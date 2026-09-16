@@ -19,3 +19,4 @@
 - **Task 4: Zustand State Store with Undo/Redo, DND Reordering & Debounced Auto-Save** — [DONE] (Commit: `0af72d3`, Tests: 83/83 passed)
 - **Task 5: Local LLM Engine (Ollama) & ATS Analyzer Utility** — [DONE] (Commit: `98897e7`, Tests: 109/109 passed)
 - **Task 6: HTML Resume Templates (Classic ATS, Modern Minimal, Executive)** — [DONE] (Commit: `a88aa15`, Tests: 127/127 passed)
+- **Task 7: Vector PDF (@react-pdf/renderer) and Native DOCX (docx) Exporters** — [DONE] (Commit: `7b5dd8a`, Tests: 137/137 passed)
