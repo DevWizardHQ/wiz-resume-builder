@@ -20,3 +20,6 @@
 - **Task 5: Local LLM Engine (Ollama) & ATS Analyzer Utility** — [DONE] (Commit: `98897e7`, Tests: 109/109 passed)
 - **Task 6: HTML Resume Templates (Classic ATS, Modern Minimal, Executive)** — [DONE] (Commit: `a88aa15`, Tests: 127/127 passed)
 - **Task 7: Vector PDF (@react-pdf/renderer) and Native DOCX (docx) Exporters** — [DONE] (Commit: `7b5dd8a`, Tests: 137/137 passed)
+- **Task 8: Split-Screen Resume Editor Core, Accordion Form & Toolbar** — [DONE] (Commit: `9a82cd4`, Tests: 143/143 passed)
+- **Task 9: AI In-Line Bullet Optimizer & ATS Review Drawer** — [DONE] (Commit: `a942bd1`, Tests: 149/149 passed)
+- **Task 10: Multi-Resume Dashboard & AI Cover Letter Generator** — [DONE] (Tests: 161/161 passed)
