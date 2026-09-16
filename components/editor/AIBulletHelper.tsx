@@ -97,7 +97,7 @@ export const AIBulletHelper: React.FC<AIBulletHelperProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<string[]>([]);
-  const [resultSource, setResultSource] = useState<'ollama' | 'fallback' | null>(null);
+  const [resultSource, setResultSource] = useState<'omniroute' | 'openai' | 'ollama' | 'fallback' | null>(null);
   const [modelUsed, setModelUsed] = useState<string | undefined>(undefined);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [appliedIndex, setAppliedIndex] = useState<number | null>(null);
@@ -156,7 +156,8 @@ export const AIBulletHelper: React.FC<AIBulletHelperProps> = ({
       }
 
       setResults(generatedBullets);
-      setResultSource(data.source === 'ollama' ? 'ollama' : 'fallback');
+      const src = data.source || 'fallback';
+      setResultSource(src === 'omniroute' || src === 'openai' || src === 'ollama' ? src : 'fallback');
       setModelUsed(data.modelUsed);
     } catch (err: any) {
       setError(err?.message || 'Error communicating with AI optimizer service.');
@@ -344,7 +345,17 @@ export const AIBulletHelper: React.FC<AIBulletHelperProps> = ({
                   <h4 className="text-xs font-semibold text-foreground">
                     Generated Google X-Y-Z Bullets
                   </h4>
-                  {resultSource === 'ollama' ? (
+                  {resultSource === 'omniroute' ? (
+                    <Badge variant="default" className="text-[10px] py-0 px-2 gap-1 font-normal bg-indigo-600 text-white hover:bg-indigo-700">
+                      <Sparkles className="h-2.5 w-2.5" />
+                      OmniRoute AI ({modelUsed || 'gpt-4o-mini'})
+                    </Badge>
+                  ) : resultSource === 'openai' ? (
+                    <Badge variant="success" className="text-[10px] py-0 px-2 gap-1 font-normal bg-emerald-600 text-white">
+                      <Sparkles className="h-2.5 w-2.5" />
+                      OpenAI ({modelUsed || 'gpt-4o-mini'})
+                    </Badge>
+                  ) : resultSource === 'ollama' ? (
                     <Badge variant="success" className="text-[10px] py-0 px-2 gap-1 font-normal">
                       <Cpu className="h-2.5 w-2.5" />
                       Local Ollama ({modelUsed || 'llama3.2'})

@@ -39,7 +39,7 @@ export default function CoverLettersPage() {
   const [isLoadingResumes, setIsLoadingResumes] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedLetter, setGeneratedLetter] = useState<string>('');
-  const [generationSource, setGenerationSource] = useState<'ollama' | 'fallback' | null>(null);
+  const [generationSource, setGenerationSource] = useState<'omniroute' | 'openai' | 'ollama' | 'fallback' | null>(null);
   const [modelUsed, setModelUsed] = useState<string | undefined>();
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -229,7 +229,7 @@ export default function CoverLettersPage() {
             AI-Tailored Cover Letter Generator
           </h1>
           <p className="text-sm sm:text-base text-muted-foreground max-w-3xl">
-            Synthesize your resume achievements with target job requirements using local Ollama LLM intelligence. Generate tailored, ATS-aligned cover letters ready for instant export.
+            Synthesize your resume achievements with target job requirements using OmniRoute, OpenAI, or Ollama AI intelligence. Generate tailored, ATS-aligned cover letters ready for instant export.
           </p>
         </div>
 
@@ -370,6 +370,18 @@ export default function CoverLettersPage() {
                     <CardTitle className="text-base font-semibold">
                       Cover Letter Document
                     </CardTitle>
+                    {generationSource === 'omniroute' && (
+                      <Badge variant="default" className="text-[10px] px-2 py-0 gap-1 font-normal bg-indigo-600 text-white">
+                        <Sparkles className="h-2.5 w-2.5" />
+                        OmniRoute AI ({modelUsed || 'gpt-4o-mini'})
+                      </Badge>
+                    )}
+                    {generationSource === 'openai' && (
+                      <Badge variant="success" className="text-[10px] px-2 py-0 gap-1 font-normal bg-emerald-600 text-white">
+                        <Sparkles className="h-2.5 w-2.5" />
+                        OpenAI ({modelUsed || 'gpt-4o-mini'})
+                      </Badge>
+                    )}
                     {generationSource === 'ollama' && (
                       <Badge variant="success" className="text-[10px] px-1.5 py-0 gap-1 font-normal">
                         <Bot className="h-2.5 w-2.5" />

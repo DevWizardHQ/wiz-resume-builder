@@ -67,6 +67,16 @@ describe('Supabase Client & Auth Configuration', () => {
       expect(client).toBeDefined();
       expect(client.auth).toBeDefined();
     });
+
+    it('initializes seamlessly with NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY when ANON_KEY is absent', () => {
+      delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://custom-project.supabase.co';
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = 'custom-publishable-key-67890';
+
+      const client = getBrowserClient();
+      expect(client).toBeDefined();
+      expect(client.auth).toBeDefined();
+    });
   });
 
   describe('Server Client (lib/supabase/server.ts)', () => {

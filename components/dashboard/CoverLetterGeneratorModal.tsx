@@ -59,7 +59,7 @@ export function CoverLetterGeneratorModal({
   const [jobDescription, setJobDescription] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedLetter, setGeneratedLetter] = useState<string>('');
-  const [generationSource, setGenerationSource] = useState<'ollama' | 'fallback' | null>(null);
+  const [generationSource, setGenerationSource] = useState<'omniroute' | 'openai' | 'ollama' | 'fallback' | null>(null);
   const [modelUsed, setModelUsed] = useState<string | undefined>();
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -225,7 +225,7 @@ export function CoverLetterGeneratorModal({
             </DialogTitle>
           </div>
           <DialogDescription>
-            Synthesize your resume achievements with a target role using local Ollama LLM intelligence.
+            Synthesize your resume achievements with a target role using OmniRoute / OpenAI / Ollama AI intelligence.
           </DialogDescription>
         </DialogHeader>
 
@@ -333,10 +333,20 @@ export function CoverLetterGeneratorModal({
                   <Label className="text-sm font-semibold text-foreground">
                     Generated Cover Letter Draft
                   </Label>
-                  {generationSource === 'ollama' ? (
+                  {generationSource === 'omniroute' ? (
+                    <Badge variant="default" className="text-[10px] px-2 py-0 gap-1 bg-indigo-600 text-white">
+                      <Sparkles className="h-2.5 w-2.5" />
+                      OmniRoute AI ({modelUsed || 'gpt-4o-mini'})
+                    </Badge>
+                  ) : generationSource === 'openai' ? (
+                    <Badge variant="success" className="text-[10px] px-2 py-0 gap-1 bg-emerald-600 text-white">
+                      <Sparkles className="h-2.5 w-2.5" />
+                      OpenAI ({modelUsed || 'gpt-4o-mini'})
+                    </Badge>
+                  ) : generationSource === 'ollama' ? (
                     <Badge variant="success" className="text-[10px] px-1.5 py-0 gap-1">
                       <Bot className="h-2.5 w-2.5" />
-                      Ollama LLM ({modelUsed || 'llama3'})
+                      Ollama LLM ({modelUsed || 'llama3.2'})
                     </Badge>
                   ) : (
                     <Badge variant="secondary" className="text-[10px] px-1.5 py-0 gap-1">

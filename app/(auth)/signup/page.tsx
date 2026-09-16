@@ -2,22 +2,28 @@
 
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
-import { Mail, Lock, Loader2, Sparkles, AlertCircle, ArrowRight } from 'lucide-react';
+import { Mail, Lock, Loader2, Sparkles, AlertCircle, CheckCircle2, ArrowRight } from 'lucide-react';
 import { signup } from '@/app/(auth)/auth-actions';
 
 export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
+    setMessage(null);
     const formData = new FormData(event.currentTarget);
 
     startTransition(async () => {
       const result = await signup(formData);
-      if (result && result.error) {
-        setError(result.error);
+      if (result) {
+        if (result.error) {
+          setError(result.error);
+        } else if (result.message) {
+          setMessage(result.message);
+        }
       }
     });
   };
@@ -52,89 +58,114 @@ export default function SignupPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label
-                htmlFor="email"
-                className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5"
-              >
-                Email Address
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                  <Mail className="w-4 h-4" />
-                </div>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  placeholder="you@example.com"
-                  className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm"
-                />
+          {message ? (
+            <div className="space-y-6 text-center py-4">
+              <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto">
+                <CheckCircle2 className="w-6 h-6" />
               </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label
-                  htmlFor="password"
-                  className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider"
-                >
-                  Password
-                </label>
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  Verification Email Sent
+                </h3>
+                <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                  {message}
+                </p>
               </div>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                  <Lock className="w-4 h-4" />
-                </div>
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="new-password"
-                  required
-                  placeholder="••••••••"
-                  minLength={6}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm"
-                />
-              </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Must be at least 6 characters long
-              </p>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isPending}
-              className="w-full mt-2 py-2.5 px-4 rounded-lg bg-primary text-primary-foreground font-medium text-sm flex items-center justify-center gap-2 shadow-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            >
-              {isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Creating account...</span>
-                </>
-              ) : (
-                <>
-                  <span>Create Account</span>
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
-            </button>
-          </form>
-
-          <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 text-center">
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-              Already have an account?{' '}
               <Link
                 href="/login"
-                className="font-semibold text-primary hover:underline transition-colors"
+                className="inline-flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-lg bg-primary text-primary-foreground font-medium text-sm shadow-md hover:bg-primary/90 transition-all"
               >
-                Sign in
+                Go to Sign In
+                <ArrowRight className="w-4 h-4" />
               </Link>
-            </p>
-          </div>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label
+                  htmlFor="email"
+                  className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5"
+                >
+                  Email Address
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <Mail className="w-4 h-4" />
+                  </div>
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    placeholder="you@example.com"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label
+                    htmlFor="password"
+                    className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider"
+                  >
+                    Password
+                  </label>
+                </div>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <Lock className="w-4 h-4" />
+                  </div>
+                  <input
+                    id="password"
+                    name="password"
+                    type="password"
+                    autoComplete="new-password"
+                    required
+                    placeholder="••••••••"
+                    minLength={6}
+                    className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm"
+                  />
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Must be at least 6 characters long
+                </p>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isPending}
+                className="w-full mt-2 py-2.5 px-4 rounded-lg bg-primary text-primary-foreground font-medium text-sm flex items-center justify-center gap-2 shadow-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                {isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Creating account...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Create Account</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </form>
+          )}
+
+          {!message && (
+            <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 text-center">
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Already have an account?{' '}
+                <Link
+                  href="/login"
+                  className="font-semibold text-primary hover:underline transition-colors"
+                >
+                  Sign in
+                </Link>
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Back to Home Link */}
