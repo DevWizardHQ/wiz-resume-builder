@@ -17,3 +17,4 @@
 - **Task 2: Supabase SSR Client, Database Migration & Auth Pages** — [DONE] (Commit: `e4a7d5768efdb1d06024297d6ff59da5e62817f8`, Tests: 17/17 passed)
 - **Task 3: Resume Contracts, Reverse-Chronological Date Sorter & Unit Tests** — [DONE] (Commit: `893abf2`, Tests: 53/53 passed)
 - **Task 4: Zustand State Store with Undo/Redo, DND Reordering & Debounced Auto-Save** — [DONE] (Commit: `0af72d3`, Tests: 83/83 passed)
+- **Task 5: Local LLM Engine (Ollama) & ATS Analyzer Utility** — [DONE] (Commit: `98897e7`, Tests: 109/109 passed)
