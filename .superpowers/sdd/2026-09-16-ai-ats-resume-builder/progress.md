@@ -18,3 +18,4 @@
 - **Task 3: Resume Contracts, Reverse-Chronological Date Sorter & Unit Tests** — [DONE] (Commit: `893abf2`, Tests: 53/53 passed)
 - **Task 4: Zustand State Store with Undo/Redo, DND Reordering & Debounced Auto-Save** — [DONE] (Commit: `0af72d3`, Tests: 83/83 passed)
 - **Task 5: Local LLM Engine (Ollama) & ATS Analyzer Utility** — [DONE] (Commit: `98897e7`, Tests: 109/109 passed)
+- **Task 6: HTML Resume Templates (Classic ATS, Modern Minimal, Executive)** — [DONE] (Commit: `a88aa15`, Tests: 127/127 passed)
