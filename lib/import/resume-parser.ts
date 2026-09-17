@@ -142,21 +142,37 @@ export function splitIntoSections(text: string): Array<{ key: SectionKey; raw: s
     currentLines = [];
   };
 
-  let headerFound = false;
+  const headerMatch = (trimmed: string): { key: SectionKey; prefixLen: number } | null => {
+    for (const h of SECTION_HEADERS) {
+      for (const p of h.patterns) {
+        const m = trimmed.match(p);
+        if (m?.[0]) return { key: h.key, prefixLen: m[0].length };
+      }
+    }
+    return null;
+  };
+
   for (const line of lines) {
     const trimmed = line.trim();
-    const match = SECTION_HEADERS.find((h) =>
-      h.patterns.some((p) => p.test(trimmed))
-    );
-    if (match && (trimmed.length <= 60 || headerFound)) {
+    const match = headerMatch(trimmed);
+
+    if (match) {
       flush();
       currentKey = match.key;
-      headerFound = true;
       currentLines = [];
-    } else {
-      currentLines.push(line);
+
+      const remainder = trimmed
+        .slice(match.prefixLen)
+        .replace(/^[:\-–—]\s*/, '')
+        .trim();
+
+      if (remainder) currentLines.push(remainder);
+      continue;
     }
+
+    currentLines.push(line);
   }
+
   flush();
   return segments;
 }
@@ -966,14 +982,64 @@ export async function extractTextFromFile(file: File): Promise<string> {
     if (typeof window !== 'undefined') {
       pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
     }
+
     const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() })
       .promise;
+
     const pages: string[] = [];
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
       const content = await page.getTextContent();
-      pages.push(content.items.map((it: any) => it.str || '').join(' '));
+      const items: any[] = Array.isArray((content as any)?.items)
+        ? ((content as any).items as any[])
+        : [];
+
+      // pdfjs textContent loses layout when joined raw. Rebuild per-line
+      // ordering using transform coordinates: e=x (index 4), f=y (index 5).
+      const lineMap = new Map<number, Array<{ x: number; str: string }>>();
+
+      for (const it of items) {
+        const str = typeof it?.str === 'string' ? it.str : '';
+        if (!str.trim()) continue;
+
+        const transform = it?.transform;
+        if (!Array.isArray(transform) || transform.length < 6) continue;
+
+        const x = transform[4];
+        const y = transform[5];
+        if (typeof x !== 'number' || typeof y !== 'number') continue;
+
+        const key = Math.round(y);
+        const bucket = lineMap.get(key) || [];
+        bucket.push({ x, str: str.trim() });
+        lineMap.set(key, bucket);
+      }
+
+      if (lineMap.size > 0) {
+        const yKeys = Array.from(lineMap.keys()).sort((a, b) => b - a);
+        const lines = yKeys
+          .map((key) => {
+            const bucket = lineMap.get(key) || [];
+            bucket.sort((a, b) => a.x - b.x);
+            return bucket
+              .map((b) => b.str)
+              .join(' ')
+              .replace(/\s+/g, ' ')
+              .trim();
+          })
+          .filter((l) => l.length > 0);
+
+        pages.push(lines.join('\n'));
+      } else {
+        pages.push(
+          items
+            .map((it: any) => (typeof it?.str === 'string' ? it.str : ''))
+            .filter(Boolean)
+            .join(' ')
+        );
+      }
     }
+
     return pages.join('\n\n');
   }
 
