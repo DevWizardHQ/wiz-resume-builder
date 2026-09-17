@@ -6,8 +6,11 @@ import {
   ResumeData,
   ResumeRecord,
   SectionKey,
+  SkillCategory,
   TemplateId,
 } from '@/types/resume';
+import { emptyResumeData } from '@/lib/import/id';
+import { ImportMode } from '@/types/import';
 import {
   sortAwardsByDate,
   sortCertificationsByDate,
@@ -66,6 +69,9 @@ export interface ResumeStoreState {
   updateContact: (contact: Partial<ContactInfo>) => void;
   updateSummary: (text: string, visible?: boolean) => void;
 
+  // Action: Import / Auto-Fill
+  importResumeData: (newData: ResumeData, mode?: ImportMode) => void;
+
   // Actions: Generic Array Items (Experience, Projects, Education, etc.)
   addItem: <K extends keyof ResumeData>(
     section: K,
@@ -93,6 +99,57 @@ export interface ResumeStoreState {
   triggerAutoSave: () => void;
   forceSave: () => Promise<void>;
   setSaveError: (error: string | null) => void;
+}
+
+/** Strips leading first-person pronouns for ATS-parity imports. */
+function sanitizeImportText(text: string): string {
+  return text.replace(/^\s*(I|me|my|mine|we|us|our|ours)\s+/i, '').trim();
+}
+
+/** Appends items from incoming lists that don't already exist (by key field). */
+function appendUnique<T extends { id: string; order: number }>(
+  existing: T[],
+  incoming: T[],
+  dedupeKey: keyof T | string
+): T[] {
+  const seen = new Set(existing.map((e) => String((e as any)[dedupeKey] || '').toLowerCase()));
+  let order = existing.length;
+  const additions: T[] = [];
+  for (const item of incoming) {
+    const key = String((item as any)[dedupeKey] || '').toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    additions.push({ ...item, order: order++ });
+  }
+  return [...existing, ...additions];
+}
+
+/** Merges skill categories by categoryName, de-duplicating skill names. */
+function mergeSkillCategories(
+  existing: SkillCategory[],
+  incoming: SkillCategory[]
+): SkillCategory[] {
+  const merged: SkillCategory[] = existing.map((c) => ({ ...c }));
+  const seenCat = new Set(merged.map((c) => c.categoryName.toLowerCase()));
+  for (const cat of incoming) {
+    const key = cat.categoryName.toLowerCase();
+    if (seenCat.has(key)) {
+      const target = merged.find((c) => c.categoryName.toLowerCase() === key);
+      if (target) {
+        const seenSkill = new Set(target.skills.map((s) => s.toLowerCase()));
+        for (const s of cat.skills) {
+          if (!seenSkill.has(s.toLowerCase())) {
+            target.skills.push(s);
+            seenSkill.add(s.toLowerCase());
+          }
+        }
+      }
+      continue;
+    }
+    seenCat.add(key);
+    merged.push({ ...cat, order: merged.length });
+  }
+  return merged;
 }
 
 export const useResumeStore = create<ResumeStoreState>((set, get) => {
@@ -280,6 +337,49 @@ export const useResumeStore = create<ResumeStoreState>((set, get) => {
             visible: visible !== undefined ? visible : state.data.summary.visible,
           },
         },
+      }));
+      scheduleSave();
+    },
+
+    importResumeData: (newData, mode = 'merge') => {
+      const state = get();
+      const existing = JSON.parse(JSON.stringify(state.data)) as ResumeData;
+      const imported = JSON.parse(JSON.stringify(newData)) as ResumeData;
+
+      let nextData: ResumeData;
+      if (mode === 'replace') {
+        // Full replace: keep section order & template, swap content wholesale.
+        nextData = {
+          ...emptyResumeData(),
+          ...imported,
+          contact: { ...emptyResumeData().contact, ...imported.contact },
+          summary: imported.summary.text
+            ? { ...imported.summary, text: sanitizeImportText(imported.summary.text) }
+            : existing.summary,
+        };
+      } else {
+        // Merge: contact fills only empty fields; array sections append by key.
+        nextData = {
+          ...existing,
+          contact: { ...existing.contact, ...imported.contact },
+          summary: imported.summary.text
+            ? { text: sanitizeImportText(imported.summary.text), visible: existing.summary.visible }
+            : existing.summary,
+          experience: appendUnique(existing.experience, imported.experience, 'company'),
+          projects: appendUnique(existing.projects, imported.projects, 'name'),
+          education: appendUnique(existing.education, imported.education, 'institution'),
+          skills: mergeSkillCategories(existing.skills, imported.skills),
+          certifications: appendUnique(existing.certifications, imported.certifications, 'name'),
+          involvement: appendUnique(existing.involvement, imported.involvement, 'organization'),
+          awards: appendUnique(existing.awards, imported.awards, 'title'),
+          publications: appendUnique(existing.publications, imported.publications, 'title'),
+          references: appendUnique(existing.references, imported.references, 'name'),
+        };
+      }
+
+      set((current) => ({
+        ...snapshot(current),
+        data: nextData,
       }));
       scheduleSave();
     },

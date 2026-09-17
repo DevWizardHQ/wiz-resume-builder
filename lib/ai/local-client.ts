@@ -350,7 +350,7 @@ export function generateFallbackBullets(
 /**
  * Executes a chat completion request to an OpenAI-compatible endpoint (OmniRoute or OpenAI).
  */
-async function callOpenAiCompatibleApi(
+export async function callOpenAiCompatibleApi(
   baseUrl: string,
   apiKey: string,
   model: string,
@@ -398,7 +398,7 @@ async function callOpenAiCompatibleApi(
 /**
  * Executes a generation request to the local Ollama daemon.
  */
-async function callOllamaGenerateApi(
+export async function callOllamaGenerateApi(
   endpoint: string,
   model: string,
   prompt: string,

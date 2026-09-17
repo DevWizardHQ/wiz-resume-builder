@@ -1,7 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { genId, emptyResumeData } from '@/lib/import/id';
 import { INITIAL_RESUME_DATA, SectionKey } from '@/types/resume';
-import { parseJsonResumeContent } from '@/lib/import/resume-parser';
+import {
+  parseJsonResumeContent,
+  parseTextResumeContent,
+  parseImportedFile,
+  extractContactInfo,
+  extractBullets,
+  splitIntoSections,
+} from '@/lib/import/resume-parser';
 
 describe('import id & shape utils', () => {
   it('genId returns prefix + unique deterministic suffix', () => {
@@ -139,5 +146,127 @@ describe('JSON Resume standard import', () => {
     expect(data!.contact.fullName).toBe('No Section');
     expect(data!.experience).toEqual([]);
     expect(data!.summary.text).toBe('');
+  });
+});
+
+const PLAIN_TEXT = `Jane Doe
+San Francisco, CA | jane.doe@example.com | +1 (555) 013-2478
+linkedin.com/in/janedoe | github.com/janedoe
+
+PROFESSIONAL SUMMARY
+Senior software engineer with 8+ years of experience building scalable APIs.
+
+EXPERIENCE
+Senior Full Stack Engineer, Acme Corp
+2018-03 - 2024-01
+- Led migration to TypeScript microservices
+- Reduced infrastructure costs by 22%
+- Improved API latency by 35%
+
+Software Engineer, Globex (2015-06 - Present)
+Built real-time analytics dashboards
+Cut reporting time from hours to minutes
+
+EDUCATION
+B.S. Computer Science, MIT, 2011-09 - 2015-05
+
+SKILLS
+TypeScript, React, Node.js, AWS, Kubernetes, PostgreSQL
+
+PROJECTS
+Wiz Parser | github.com/wiz/parser (2023-01 - 2023-06)
+- Parsed 10k+ resumes with 98% accuracy
+`;
+
+describe('plain text heuristic parser', () => {
+  it('segments text into expected sections', () => {
+    const sections = splitIntoSections(PLAIN_TEXT);
+    const keys = sections.map((s) => s.key);
+    expect(keys).toEqual(expect.arrayContaining(['summary', 'experience', 'education', 'skills', 'projects']));
+  });
+
+  it('extracts contact details from a text block', () => {
+    const contact = extractContactInfo(`Jane Doe
+San Francisco, CA | jane.doe@example.com | +1 (555) 013-2478
+linkedin.com/in/janedoe | github.com/janedoe`);
+    expect(contact.email).toBe('jane.doe@example.com');
+    expect(contact.phone).toContain('555');
+    expect(contact.fullName).toBe('Jane Doe');
+  });
+
+  it('parses experience with bullets, dates, and current status', () => {
+    const data = parseTextResumeContent(PLAIN_TEXT);
+    expect(data.contact.fullName).toBe('Jane Doe');
+    expect(data.contact.email).toBe('jane.doe@example.com');
+    expect(data.experience).toHaveLength(2);
+
+    const acme = data.experience[0];
+    expect(acme.company).toBe('Acme Corp');
+    expect(acme.role).toBe('Senior Full Stack Engineer');
+    expect(acme.startDate).toBe('2018-03');
+    expect(acme.endDate).toBe('2024-01');
+    expect(acme.current).toBe(false);
+    expect(acme.bullets).toContain('Led migration to TypeScript microservices');
+    expect(acme.bullets[0]).not.toMatch(/^\s*(I|my|we|our)\s/i);
+
+    const globex = data.experience[1];
+    expect(globex.current).toBe(true);
+    expect(globex.endDate).toBe('Present');
+  });
+
+  it('extracts education, categorized skills, and projects', () => {
+    const data = parseTextResumeContent(PLAIN_TEXT);
+    expect(data.education[0].institution).toBe('MIT');
+    expect(data.education[0].degree).toBe('B.S.');
+    expect(data.education[0].fieldOfStudy).toBe('Computer Science');
+    expect(data.skills.length).toBeGreaterThanOrEqual(1);
+    const allSkills = data.skills.flatMap((s) => s.skills);
+    expect(allSkills).toEqual(expect.arrayContaining(['TypeScript', 'AWS']));
+    expect(data.projects[0].name).toBe('Wiz Parser');
+    expect(data.projects[0].bullets[0]).toContain('10k');
+  });
+
+  it('extracts bullet lines from raw text and normalizes markers', () => {
+    const bullets = extractBullets(`  • First point
+- Second point
+* Third point`);
+    expect(bullets).toEqual(['First point', 'Second point', 'Third point']);
+  });
+
+  it('handles sparse input without throwing', () => {
+    const data = parseTextResumeContent('Just a plain line of text.');
+    expect(data.experience).toEqual([]);
+    expect(data.contact.fullName).toBe('');
+  });
+});
+
+describe('file ingestion dispatch', () => {
+  it('parses a .json file as JSON Resume when valid', async () => {
+    const file = new File(
+      [JSON.stringify(JSON_RESUME_SAMPLE)],
+      'resume.json',
+      { type: 'application/json' }
+    );
+    const result = await parseImportedFile(file);
+    expect(result.data.contact.fullName).toBe('Jane Doe');
+    expect(result.sourceType).toBe('json');
+  });
+
+  it('parses a .txt file with plain heuristics', async () => {
+    const file = new File([PLAIN_TEXT], 'resume.txt', {
+      type: 'text/plain',
+    });
+    const result = await parseImportedFile(file);
+    expect(result.data.contact.email).toBe('jane.doe@example.com');
+    expect(result.sourceType).toBe('text');
+  });
+
+  it('rejects unsupported file types with a descriptive error', async () => {
+    const file = new File(['nope'], 'resume.exe', {
+      type: 'application/x-msdownload',
+    });
+    await expect(parseImportedFile(file)).rejects.toThrow(
+      /unsupported|no support/i
+    );
   });
 });
