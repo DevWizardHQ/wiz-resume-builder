@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { CreateResumeDialog } from '@/components/dashboard/CreateResumeDialog';
+import { ImportResumeDialog } from '@/components/dashboard/ImportResumeDialog';
 import { ResumeCard } from '@/components/dashboard/ResumeCard';
 import { CoverLetterGeneratorModal } from '@/components/dashboard/CoverLetterGeneratorModal';
 import { ResumeRecord, TemplateId } from '@/types/resume';
@@ -142,6 +143,7 @@ export default function DashboardPage() {
 
         <div className="flex items-center gap-3">
           <CoverLetterGeneratorModal resumes={resumes} />
+          <ImportResumeDialog />
           <CreateResumeDialog
             open={isCreateOpen}
             onOpenChange={setIsCreateOpen}
