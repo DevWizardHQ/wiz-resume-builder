@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AIReviewDrawer } from '@/components/editor/AIReviewDrawer';
 import { EditorSidebar } from '@/components/editor/EditorSidebar';
+import { ImportResumeModal } from '@/components/editor/ImportResumeModal';
 import { LivePreviewPane } from '@/components/editor/LivePreviewPane';
 import { createClient } from '@/lib/supabase/client';
 import { useResumeStore } from '@/store/useResumeStore';
@@ -293,8 +294,11 @@ export default function EditorPage({ params }: EditorPageProps) {
           </div>
         </div>
 
-        {/* Right: ATS Score & Mobile View Toggle */}
+        {/* Right: Import, ATS Score & Mobile View Toggle */}
         <div className="flex items-center gap-2">
+          {/* Import / Auto-Fill Resume Modal Trigger */}
+          <ImportResumeModal />
+
           {/* ATS Review Drawer Trigger */}
           <AIReviewDrawer
             trigger={

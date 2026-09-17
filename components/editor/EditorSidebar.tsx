@@ -29,6 +29,7 @@ import {
   Users,
 } from 'lucide-react';
 import { SectionContainer } from '@/components/editor/SectionContainer';
+import { ImportResumeModal } from '@/components/editor/ImportResumeModal';
 import { AwardsSection } from '@/components/editor/sections/AwardsSection';
 import { CertificationsSection } from '@/components/editor/sections/CertificationsSection';
 import { ContactSection } from '@/components/editor/sections/ContactSection';
@@ -154,10 +155,11 @@ export const EditorSidebar: React.FC = () => {
 
   return (
     <aside className="w-full h-full overflow-y-auto pr-1 pb-16 space-y-3 custom-scrollbar">
-      <div className="flex items-center justify-between px-1 pb-1">
+      <div className="flex items-center justify-between px-1 pb-1 gap-2">
         <p className="text-xs text-muted-foreground">
           Drag sections by their handles <span className="font-mono">⠿</span> to reorder in live preview and exports.
         </p>
+        <ImportResumeModal />
       </div>
 
       <DndContext
