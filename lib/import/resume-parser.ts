@@ -592,7 +592,7 @@ export function jsonResumeToImported(raw: unknown): ImportedResume {
             id: genId('exp'),
             visible: true,
             order: idx,
-            company: toStringOrEmpty(obj.company).trim() || 'Unknown Company',
+            company: toStringOrEmpty(obj.company || obj.name).trim() || 'Unknown Company',
             role: toStringOrEmpty(obj.position || obj.title).trim(),
             location:
               obj.location !== undefined
