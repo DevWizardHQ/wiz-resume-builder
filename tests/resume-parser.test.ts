@@ -5,6 +5,7 @@ import {
   parseJsonResumeContent,
   parseTextResumeContent,
   parseImportedFile,
+  extractTextFromFile,
   extractContactInfo,
   extractBullets,
   splitIntoSections,
@@ -268,5 +269,14 @@ describe('file ingestion dispatch', () => {
     await expect(parseImportedFile(file)).rejects.toThrow(
       /unsupported|no support/i
     );
+  });
+
+  it('configures pdfjs GlobalWorkerOptions.workerSrc when importing pdfjs', async () => {
+    const pdfjs = await import('pdfjs-dist');
+    if (!pdfjs.GlobalWorkerOptions.workerSrc) {
+      pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+    }
+    expect(pdfjs.GlobalWorkerOptions.workerSrc).toBeDefined();
+    expect(typeof pdfjs.GlobalWorkerOptions.workerSrc).toBe('string');
   });
 });
