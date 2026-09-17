@@ -963,6 +963,9 @@ export async function extractTextFromFile(file: File): Promise<string> {
 
   if (name.endsWith('.pdf') || file.type === 'application/pdf') {
     const pdfjs = await import('pdfjs-dist');
+    if (typeof window !== 'undefined') {
+      pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+    }
     const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() })
       .promise;
     const pages: string[] = [];
