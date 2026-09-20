@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
+import { getAppUrl } from '@/lib/utils';
 
 export interface AuthActionResult {
   error?: string;
@@ -42,7 +43,7 @@ export async function signup(formData: FormData): Promise<AuthActionResult | voi
     return { error: 'Email and password are required.' };
   }
 
-  let origin = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  let origin = getAppUrl();
   try {
     const headerList = await headers();
     const originHeader = headerList.get('origin');

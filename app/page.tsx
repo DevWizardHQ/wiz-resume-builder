@@ -30,6 +30,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { getAppHost } from '@/lib/utils';
 
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState<'classic-ats' | 'modern-minimal' | 'executive'>('classic-ats');
@@ -155,7 +156,7 @@ export default function HomePage() {
                     <span className="h-3 w-3 rounded-full bg-emerald-400/80 inline-block" />
                   </div>
                   <div className="font-mono text-[11px] bg-background/80 px-4 py-0.5 rounded border border-border/50 text-foreground">
-                    wiz-resume.app/editor/demo-resume-1
+                    {getAppHost()}/editor/demo-resume-1
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant="success" className="text-[10px] px-1.5 py-0 gap-1 font-medium">
