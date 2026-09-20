@@ -177,6 +177,90 @@ export function splitIntoSections(text: string): Array<{ key: SectionKey; raw: s
   return segments;
 }
 
+/** Validates whether a candidate string is a plausible telephone / mobile number. */
+export function isValidPhone(candidate: string): boolean {
+  if (!candidate || typeof candidate !== 'string') return false;
+  // Strip leading non-digit/plus and trailing non-digit/closing-parenthesis
+  const stripped = candidate.trim().replace(/^[^\d+]+|[^\d)]+$/g, '');
+  const digits = (stripped.match(/\d/g) || []).join('');
+
+  // Phone numbers usually have between 7 and 16 digits (E.164 max is 15 + leading 0/prefix)
+  if (digits.length < 7 || digits.length > 16) return false;
+
+  // Check for repeating identical digits like "000000000" or "111111111"
+  if (/^(\d)\1+$/.test(digits)) return false;
+
+  // Exclude date ranges like "2018 - 2024", "2018-03 - 2024-01"
+  if (
+    /^(?:19|20)\d{2}(?:[-/.](?:0?[1-9]|1[0-2]))?\s*[-–—/]\s*(?:19|20)\d{2}(?:[-/.](?:0?[1-9]|1[0-2]))?$/.test(
+      stripped
+    )
+  )
+    return false;
+
+  // Exclude single ISO / date patterns like "2020-05-12" or "12/05/2020"
+  if (/^(?:19|20)\d{2}[-/.](?:0?[1-9]|1[0-2])[-/.](?:0?[1-9]|[12]\d|3[01])$/.test(stripped)) return false;
+  if (/^(?:0?[1-9]|[12]\d|3[01])[-/.](?:0?[1-9]|1[0-2])[-/.](?:19|20)\d{2}$/.test(stripped)) return false;
+
+  // Exclude strings containing month names
+  if (/\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\b/i.test(candidate)) return false;
+
+  return true;
+}
+
+/** Extracts a phone or mobile number from raw resume text using multi-pattern heuristics. */
+export function extractPhoneNumber(text: string): string | undefined {
+  if (!text || typeof text !== 'string') return undefined;
+
+  // 1. Explicitly labeled phone / mobile prefixes: "Phone:", "Mobile:", "Mob:", "Tel:", "Cell:", "WhatsApp:", "Contact No:"
+  const labeledRegex = /(?:(?:mobile|phone|tel(?:ephone)?|cell(?:ular)?|mob|contact|ph|whatsapp)(?:\s*(?:no|num|number|#))?)\s*[:：\-–—]?\s*([+\d\s()./-]{7,30})/gi;
+  let labeledMatch: RegExpExecArray | null;
+  while ((labeledMatch = labeledRegex.exec(text)) !== null) {
+    const rawCandidate = labeledMatch[1];
+    const trimmed = rawCandidate.split(/[\r\n|,;]|(?:\s{2,})|(?=[a-zA-Z])/)[0]?.trim();
+    if (trimmed && isValidPhone(trimmed)) {
+      const sanitized = trimmed.replace(/^[^\d+(]+|[^\d)]+$/g, '').trim();
+      if (sanitized && isValidPhone(sanitized)) return sanitized;
+    }
+  }
+
+  // 2. International phone numbers starting with + or 00 (e.g. +880 1712-345678, +1 (555) 013-2478, +44 20 7946 0919, +91 98765 43210)
+  const intlRegex = /(?:\+|00)\d{1,4}[-.\s]?(?:\(?\d{1,5}\)?[-.\s]?){1,5}\d{2,6}/g;
+  let intlMatch: RegExpExecArray | null;
+  while ((intlMatch = intlRegex.exec(text)) !== null) {
+    const candidate = intlMatch[0].trim();
+    if (isValidPhone(candidate)) {
+      return candidate.replace(/^[^\d+(]+|[^\d)]+$/g, '').trim();
+    }
+  }
+
+  // 3. Parenthesized area code (e.g. (555) 013-2478, (020) 7946-0919)
+  const parenRegex = /\(\d{2,5}\)[-.\s]?\d{2,5}[-.\s]?\d{3,5}/g;
+  let parenMatch: RegExpExecArray | null;
+  while ((parenMatch = parenRegex.exec(text)) !== null) {
+    const candidate = parenMatch[0].trim();
+    if (isValidPhone(candidate)) return candidate;
+  }
+
+  // 4. Standard grouped national numbers (e.g. 555-013-2478, 0171-234-5678)
+  const groupedRegex = /\b\d{2,5}[-.\s]\d{3,4}[-.\s]\d{3,5}\b/g;
+  let groupedMatch: RegExpExecArray | null;
+  while ((groupedMatch = groupedRegex.exec(text)) !== null) {
+    const candidate = groupedMatch[0].trim();
+    if (isValidPhone(candidate)) return candidate;
+  }
+
+  // 5. Continuous 10-11 digit sequence (e.g. 01712345678, 07911123456, 9876543210)
+  const continuousRegex = /\b(?:0\d{9,10}|[6-9]\d{9})\b/g;
+  let contMatch: RegExpExecArray | null;
+  while ((contMatch = continuousRegex.exec(text)) !== null) {
+    const candidate = contMatch[0].trim();
+    if (isValidPhone(candidate)) return candidate;
+  }
+
+  return undefined;
+}
+
 /**
  * Extracts contact metadata (name, email, phone, URLs, location) from a text block.
  */
@@ -186,10 +270,8 @@ export function extractContactInfo(text: string): Partial<ContactInfo> {
   const email = text.match(/[\w.+-]+@[\w-]+\.[\w.]+/);
   if (email) contact.email = email[0];
 
-  const phone = text.match(
-    /(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/
-  );
-  if (phone) contact.phone = phone[0];
+  const phone = extractPhoneNumber(text);
+  if (phone) contact.phone = phone;
 
   const linkedin = text.match(/linkedin\.com\/[^\s|,]+/i);
   if (linkedin) contact.linkedinUrl = `https://${linkedin[0].replace(/^https?:\/\//, '')}`;
@@ -197,17 +279,40 @@ export function extractContactInfo(text: string): Partial<ContactInfo> {
   const github = text.match(/github\.com\/[^\s|,]+/i);
   if (github) contact.githubUrl = `https://${github[0].replace(/^https?:\/\//, '')}`;
 
-  const portfolio = text.match(
-    /(?:https?:\/\/)?(?:www\.)?[a-z0-9-]+\.(?:dev|io|me|tech|site|org|com|net)\b/i
+  const labeledUrlMatch = text.match(
+    /(?:\b(?:website|portfolio|blog|personal\s+site|homepage)\b|\blink\b|\bsite\b|\bweb\b)\s*[:：\-–—]?\s*(https?:\/\/[^\s|,]+|[a-z0-9-]+\.[a-z]{2,}(?:\/[^\s|,]*)?)/i
   );
-  if (
-    portfolio &&
-    !portfolio[0].toLowerCase().includes('linkedin') &&
-    !portfolio[0].toLowerCase().includes('github')
-  ) {
-    contact.portfolioUrl = portfolio[0].startsWith('http')
-      ? portfolio[0]
-      : `https://${portfolio[0]}`;
+  if (labeledUrlMatch) {
+    const urlCand = labeledUrlMatch[1].trim();
+    if (!/linkedin\.com|github\.com/i.test(urlCand) && !urlCand.includes('@')) {
+      contact.portfolioUrl = urlCand.startsWith('http') ? urlCand : `https://${urlCand}`;
+    }
+  }
+
+  if (!contact.portfolioUrl) {
+    const sanitizedForPortfolio = text
+      .replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, '')
+      .replace(/(?:https?:\/\/)?(?:www\.)?linkedin\.com\/[^\s|,]+/gi, '')
+      .replace(/(?:https?:\/\/)?(?:www\.)?github\.com\/[^\s|,]+/gi, '');
+
+    const portfolioMatches = sanitizedForPortfolio.match(
+      /(?:https?:\/\/)?(?:www\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:dev|io|me|tech|site|org|com|net|app|co|design|info|online)\b(?:\/[^\s|,]*)?/gi
+    );
+    if (portfolioMatches) {
+      for (const candidate of portfolioMatches) {
+        const lower = candidate.toLowerCase();
+        if (
+          !lower.includes('linkedin') &&
+          !lower.includes('github') &&
+          !lower.includes('@')
+        ) {
+          contact.portfolioUrl = candidate.startsWith('http')
+            ? candidate
+            : `https://${candidate}`;
+          break;
+        }
+      }
+    }
   }
 
   const locationMatch = text.match(

@@ -112,7 +112,15 @@ export function extractStructuredResume(
 
   let aiLinkedin = '';
   let aiGithub = '';
-  let aiPortfolio = basics.url ? String(basics.url).trim() : '';
+  const rawAiPortfolio =
+    (basics as any).url ??
+    (basics as any).portfolio ??
+    (basics as any).website ??
+    (basics as any).homepage ??
+    (basics as any).link ??
+    (parsed as any).url ??
+    (parsed as any).portfolio;
+  let aiPortfolio = rawAiPortfolio ? String(rawAiPortfolio).trim() : '';
 
   if (Array.isArray(basics.profiles)) {
     for (const p of basics.profiles) {
@@ -123,7 +131,14 @@ export function extractStructuredResume(
         aiLinkedin = pUrl ? (pUrl.startsWith('http') ? pUrl : `https://${pUrl}`) : '';
       } else if (net.includes('github') || pUrl.toLowerCase().includes('github.com')) {
         aiGithub = pUrl ? (pUrl.startsWith('http') ? pUrl : `https://${pUrl}`) : '';
-      } else if (!aiPortfolio && (net.includes('portfolio') || net.includes('website') || net.includes('blog') || pUrl)) {
+      } else if (
+        !aiPortfolio &&
+        (net.includes('portfolio') ||
+          net.includes('website') ||
+          net.includes('blog') ||
+          net.includes('personal') ||
+          pUrl)
+      ) {
         aiPortfolio = pUrl ? (pUrl.startsWith('http') ? pUrl : `https://${pUrl}`) : '';
       }
     }
