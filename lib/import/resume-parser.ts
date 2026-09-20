@@ -932,7 +932,7 @@ export interface ParsedFileResult {
   sourceType: ImportSourceType;
 }
 
-function fileNameTitle(name: string): string {
+export function fileNameTitle(name: string): string {
   const base = name.replace(/\.[^/.]+$/, '');
   return base
     .split(/[-_]+/)
