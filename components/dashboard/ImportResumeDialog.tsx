@@ -26,7 +26,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { ResumeData } from '@/types/resume';
 import {
-  parseImportedFile,
+  extractTextFromFile,
+  fileNameTitle,
   parseJsonResumeContent,
   parseTextResumeContent,
 } from '@/lib/import/resume-parser';
@@ -35,6 +36,17 @@ export interface ImportResumeDialogProps {
   trigger?: React.ReactNode;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+}
+
+function formatTitle(fullName?: string, fileName?: string): string {
+  if (fullName && fullName.trim()) {
+    return `${fullName.trim()} — Resume`;
+  }
+  if (fileName) {
+    const sanitized = fileNameTitle(fileName);
+    if (sanitized) return sanitized;
+  }
+  return 'Imported Resume';
 }
 
 export const ImportResumeDialog: React.FC<ImportResumeDialogProps> = ({
@@ -65,11 +77,49 @@ export const ImportResumeDialog: React.FC<ImportResumeDialogProps> = ({
     setIsParsing(true);
     setFileName(file.name);
     try {
-      const result = await parseImportedFile(file);
-      setParsed(result.data);
-      setSource(result.sourceType);
-      setTitle(result.title);
+      const extracted = await extractTextFromFile(file);
       setPastedText('');
+
+      if (extracted.sourceType === 'json') {
+        const jsonData = parseJsonResumeContent(extracted.text);
+        if (jsonData) {
+          setParsed(jsonData);
+          setSource('json');
+          setTitle(formatTitle(jsonData.contact?.fullName, file.name));
+          return;
+        }
+      }
+
+      // Stage 2: AI schema fitting with heuristic fallback
+      try {
+        const res = await fetch('/api/ai/parse-resume', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: extracted.text,
+            rawText: extracted.text,
+            sourceType: extracted.sourceType,
+            fileName: file.name,
+          }),
+        });
+
+        if (res.ok) {
+          const result = await res.json();
+          setParsed(result.data);
+          setSource(result.source || 'heuristic');
+          setTitle(formatTitle(result.data?.contact?.fullName, file.name));
+        } else {
+          const fallbackData = parseTextResumeContent(extracted.text);
+          setParsed(fallbackData);
+          setSource('heuristic');
+          setTitle(formatTitle(fallbackData.contact?.fullName, file.name));
+        }
+      } catch {
+        const fallbackData = parseTextResumeContent(extracted.text);
+        setParsed(fallbackData);
+        setSource('heuristic');
+        setTitle(formatTitle(fallbackData.contact?.fullName, file.name));
+      }
     } catch (err: any) {
       setError(err?.message || 'Failed to read the uploaded file.');
     } finally {
@@ -104,13 +154,18 @@ export const ImportResumeDialog: React.FC<ImportResumeDialogProps> = ({
         const result = await res.json();
         setParsed(result.data);
         setSource(result.source || 'heuristic');
+        setTitle(result.data?.contact?.fullName ? `${result.data.contact.fullName} — Resume` : 'Imported Resume');
       } else {
-        setParsed(parseTextResumeContent(trimmed));
+        const fallbackData = parseTextResumeContent(trimmed);
+        setParsed(fallbackData);
         setSource('heuristic');
+        setTitle(fallbackData.contact.fullName ? `${fallbackData.contact.fullName} — Resume` : 'Imported Resume');
       }
     } catch {
-      setParsed(parseTextResumeContent(trimmed));
+      const fallbackData = parseTextResumeContent(trimmed);
+      setParsed(fallbackData);
       setSource('heuristic');
+      setTitle(fallbackData.contact.fullName ? `${fallbackData.contact.fullName} — Resume` : 'Imported Resume');
     } finally {
       setIsParsing(false);
     }
