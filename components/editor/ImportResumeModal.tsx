@@ -27,7 +27,7 @@ import { useResumeStore } from '@/store/useResumeStore';
 import { ResumeData } from '@/types/resume';
 import { ImportMode } from '@/types/import';
 import {
-  parseImportedFile,
+  extractTextFromFile,
   parseJsonResumeContent,
   parseTextResumeContent,
 } from '@/lib/import/resume-parser';
@@ -68,10 +68,43 @@ export const ImportResumeModal: React.FC<ImportResumeModalProps> = ({
     setIsParsing(true);
     setFileName(file.name);
     try {
-      const result = await parseImportedFile(file);
-      setParsed(result.data);
-      setSource(result.sourceType);
+      const extracted = await extractTextFromFile(file);
       setPastedText('');
+
+      if (extracted.sourceType === 'json') {
+        const jsonData = parseJsonResumeContent(extracted.text);
+        if (jsonData) {
+          setParsed(jsonData);
+          setSource('json');
+          return;
+        }
+      }
+
+      // Stage 2: AI schema fitting with heuristic fallback
+      try {
+        const res = await fetch('/api/ai/parse-resume', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: extracted.text,
+            rawText: extracted.text,
+            sourceType: extracted.sourceType,
+            fileName: file.name,
+          }),
+        });
+
+        if (res.ok) {
+          const result = await res.json();
+          setParsed(result.data);
+          setSource(result.source || 'heuristic');
+        } else {
+          setParsed(parseTextResumeContent(extracted.text));
+          setSource('heuristic');
+        }
+      } catch {
+        setParsed(parseTextResumeContent(extracted.text));
+        setSource('heuristic');
+      }
     } catch (err: any) {
       setError(err?.message || 'Failed to read the uploaded file.');
     } finally {
