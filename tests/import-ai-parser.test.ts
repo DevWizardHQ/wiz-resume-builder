@@ -247,6 +247,38 @@ describe('Resume Import AI - structured response parsing', () => {
     expect(result.references[0].relationship).toBe('VP of Engineering / Former Manager');
   });
 
+  it('extracts personal website and portfolio from various schema aliases and custom profiles', () => {
+    const fallback = parsePlainTextResume(RAW_TEXT);
+    const jsonWithWebsiteAlias = JSON.stringify({
+      basics: {
+        name: 'Alias User',
+        website: 'https://aliasuser.me',
+      },
+    });
+    const res1 = extractStructuredResume(jsonWithWebsiteAlias, fallback);
+    expect(res1.contact.portfolioUrl).toBe('https://aliasuser.me');
+
+    const jsonWithPortfolioAlias = JSON.stringify({
+      basics: {
+        name: 'Portfolio User',
+        portfolio: 'https://portfolio-user.dev',
+      },
+    });
+    const res2 = extractStructuredResume(jsonWithPortfolioAlias, fallback);
+    expect(res2.contact.portfolioUrl).toBe('https://portfolio-user.dev');
+
+    const jsonWithCustomProfile = JSON.stringify({
+      basics: {
+        name: 'Profile User',
+        profiles: [
+          { network: 'Personal Website', url: 'https://customsite.io' },
+        ],
+      },
+    });
+    const res3 = extractStructuredResume(jsonWithCustomProfile, fallback);
+    expect(res3.contact.portfolioUrl).toBe('https://customsite.io');
+  });
+
   it('handles markdown fences and conversational wrapper text around JSON', () => {
     const fallback = parsePlainTextResume(RAW_TEXT);
     const wrappedJson = `Here is the parsed resume in JSON format:

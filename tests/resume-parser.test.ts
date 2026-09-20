@@ -7,6 +7,8 @@ import {
   parseImportedFile,
   extractTextFromFile,
   extractContactInfo,
+  extractPhoneNumber,
+  isValidPhone,
   extractBullets,
   splitIntoSections,
 } from '@/lib/import/resume-parser';
@@ -238,6 +240,77 @@ linkedin.com/in/janedoe | github.com/janedoe`);
     const data = parseTextResumeContent('Just a plain line of text.');
     expect(data.experience).toEqual([]);
     expect(data.contact.fullName).toBe('');
+  });
+});
+
+describe('telephone & mobile number extraction', () => {
+  it('extracts explicitly labeled mobile and telephone numbers', () => {
+    expect(extractPhoneNumber('Mobile: +880 1712-345678\nEmail: dev@example.com')).toBe('+880 1712-345678');
+    expect(extractPhoneNumber('Tel: (020) 7946 0919 | London, UK')).toBe('(020) 7946 0919');
+    expect(extractPhoneNumber('Mob: 01712345678')).toBe('01712345678');
+    expect(extractPhoneNumber('Cell: 555-0199-281')).toBe('555-0199-281');
+    expect(extractPhoneNumber('WhatsApp: +91 98765 43210')).toBe('+91 98765 43210');
+    expect(extractPhoneNumber('Contact No: +1-555-0142')).toBe('+1-555-0142');
+  });
+
+  it('extracts unlabeled international phone numbers with country codes', () => {
+    expect(extractPhoneNumber('John Doe | +880 1712345678 | Dhaka')).toBe('+880 1712345678');
+    expect(extractPhoneNumber('Alice Smith +44 20 7946 0919 alice@smith.co.uk')).toBe('+44 20 7946 0919');
+    expect(extractPhoneNumber('Rahul Sharma | +91 98765 43210 | Bangalore')).toBe('+91 98765 43210');
+  });
+
+  it('extracts parenthesized area codes and continuous digit sequences', () => {
+    expect(extractPhoneNumber('Jane Doe | (555) 013-2478 | Seattle, WA')).toBe('(555) 013-2478');
+    expect(extractPhoneNumber('Alex Doe | 01712345678 | alex@test.com')).toBe('01712345678');
+  });
+
+  it('validates candidate numbers and rejects false positives like dates or invalid formats', () => {
+    expect(isValidPhone('+880 1712-345678')).toBe(true);
+    expect(isValidPhone('(555) 013-2478')).toBe(true);
+    expect(isValidPhone('01712345678')).toBe(true);
+
+    // Reject date ranges
+    expect(isValidPhone('2018 - 2024')).toBe(false);
+    expect(isValidPhone('2018-03 - 2024-01')).toBe(false);
+    expect(isValidPhone('2020-05-12')).toBe(false);
+    expect(isValidPhone('12/05/2020')).toBe(false);
+
+    // Reject months
+    expect(isValidPhone('Jan 2020 - Dec 2022')).toBe(false);
+
+    // Reject repeating digits or too short/long
+    expect(isValidPhone('0000000000')).toBe(false);
+    expect(isValidPhone('12345')).toBe(false);
+    expect(isValidPhone('1234567890123456789')).toBe(false);
+  });
+});
+
+describe('personal website & portfolio URL extraction', () => {
+  it('extracts explicitly labeled website and portfolio URLs', () => {
+    expect(
+      extractContactInfo('Jane Doe\nWebsite: https://janedoe.com\nEmail: jane@test.com').portfolioUrl
+    ).toBe('https://janedoe.com');
+    expect(
+      extractContactInfo('John Doe | Portfolio: johndoe.me | Tel: 555-0123').portfolioUrl
+    ).toBe('https://johndoe.me');
+    expect(
+      extractContactInfo('Alice | Blog: https://blog.alice.dev | London').portfolioUrl
+    ).toBe('https://blog.alice.dev');
+    expect(
+      extractContactInfo('Bob | Personal Site: bob-portfolio.design | bob@test.com').portfolioUrl
+    ).toBe('https://bob-portfolio.design');
+  });
+
+  it('extracts unlabeled developer and portfolio domains without colliding with linkedin or github', () => {
+    expect(
+      extractContactInfo('Jane Doe | janedoe.dev | linkedin.com/in/janedoe | github.com/janedoe').portfolioUrl
+    ).toBe('https://janedoe.dev');
+    expect(
+      extractContactInfo('John Doe | https://johndoe.io/portfolio | New York').portfolioUrl
+    ).toBe('https://johndoe.io/portfolio');
+    expect(
+      extractContactInfo('Alice | alice.tech | alice@example.com').portfolioUrl
+    ).toBe('https://alice.tech');
   });
 });
 
