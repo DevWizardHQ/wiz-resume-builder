@@ -953,112 +953,143 @@ async function readAsText(file: File): Promise<string> {
   });
 }
 
-/** Extracts raw text from a supported file type using client-side readers. */
-export async function extractTextFromFile(file: File): Promise<string> {
-  const name = file.name.toLowerCase();
+export interface ExtractedFileResult {
+  text: string;
+  sourceType: 'json' | 'pdf' | 'docx' | 'text';
+  fileName: string;
+}
 
-  if (
-    name.endsWith('.json') ||
-    name.endsWith('.txt') ||
-    name.endsWith('.md') ||
-    name.endsWith('.csv')
-  ) {
-    return readAsText(file);
+/** Extracts text from DOCX ArrayBuffer via mammoth. */
+export async function extractDocxText(buffer: ArrayBuffer): Promise<string> {
+  const mammoth = await import('mammoth');
+  const result = await mammoth.extractRawText({ arrayBuffer: buffer });
+  return result.value || '';
+}
+
+/** Extracts text from PDF ArrayBuffer preserving coordinates and line layout via pdfjs-dist. */
+export async function extractPdfText(buffer: ArrayBuffer): Promise<string> {
+  const pdfjs = await import('pdfjs-dist');
+  if (typeof window !== 'undefined') {
+    pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
   }
 
-  if (
-    name.endsWith('.docx') ||
-    file.type ===
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-  ) {
-    const mammoth = await import('mammoth');
-    const buffer = await file.arrayBuffer();
-    const result = await mammoth.extractRawText({ arrayBuffer: buffer });
-    return result.value || '';
-  }
+  const pdf = await pdfjs.getDocument({ data: buffer }).promise;
 
-  if (name.endsWith('.pdf') || file.type === 'application/pdf') {
-    const pdfjs = await import('pdfjs-dist');
-    if (typeof window !== 'undefined') {
-      pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+  const pages: string[] = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const items: any[] = Array.isArray((content as any)?.items)
+      ? ((content as any).items as any[])
+      : [];
+
+    // pdfjs textContent loses layout when joined raw. Rebuild per-line
+    // ordering using transform coordinates: e=x (index 4), f=y (index 5).
+    const lineMap = new Map<number, Array<{ x: number; str: string }>>();
+
+    for (const it of items) {
+      const str = typeof it?.str === 'string' ? it.str : '';
+      if (!str.trim()) continue;
+
+      const transform = it?.transform;
+      if (!Array.isArray(transform) || transform.length < 6) continue;
+
+      const x = transform[4];
+      const y = transform[5];
+      if (typeof x !== 'number' || typeof y !== 'number') continue;
+
+      const key = Math.round(y);
+      const bucket = lineMap.get(key) || [];
+      bucket.push({ x, str: str.trim() });
+      lineMap.set(key, bucket);
     }
 
-    const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() })
-      .promise;
-
-    const pages: string[] = [];
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const content = await page.getTextContent();
-      const items: any[] = Array.isArray((content as any)?.items)
-        ? ((content as any).items as any[])
-        : [];
-
-      // pdfjs textContent loses layout when joined raw. Rebuild per-line
-      // ordering using transform coordinates: e=x (index 4), f=y (index 5).
-      const lineMap = new Map<number, Array<{ x: number; str: string }>>();
-
-      for (const it of items) {
-        const str = typeof it?.str === 'string' ? it.str : '';
-        if (!str.trim()) continue;
-
-        const transform = it?.transform;
-        if (!Array.isArray(transform) || transform.length < 6) continue;
-
-        const x = transform[4];
-        const y = transform[5];
-        if (typeof x !== 'number' || typeof y !== 'number') continue;
-
-        const key = Math.round(y);
-        const bucket = lineMap.get(key) || [];
-        bucket.push({ x, str: str.trim() });
-        lineMap.set(key, bucket);
-      }
-
-      if (lineMap.size > 0) {
-        const yKeys = Array.from(lineMap.keys()).sort((a, b) => b - a);
-        const lines = yKeys
-          .map((key) => {
-            const bucket = lineMap.get(key) || [];
-            bucket.sort((a, b) => a.x - b.x);
-            return bucket
-              .map((b) => b.str)
-              .join(' ')
-              .replace(/\s+/g, ' ')
-              .trim();
-          })
-          .filter((l) => l.length > 0);
-
-        pages.push(lines.join('\n'));
-      } else {
-        pages.push(
-          items
-            .map((it: any) => (typeof it?.str === 'string' ? it.str : ''))
-            .filter(Boolean)
+    if (lineMap.size > 0) {
+      const yKeys = Array.from(lineMap.keys()).sort((a, b) => b - a);
+      const lines = yKeys
+        .map((key) => {
+          const bucket = lineMap.get(key) || [];
+          bucket.sort((a, b) => a.x - b.x);
+          return bucket
+            .map((b) => b.str)
             .join(' ')
-        );
-      }
-    }
+            .replace(/\s+/g, ' ')
+            .trim();
+        })
+        .filter((l) => l.length > 0);
 
-    return pages.join('\n\n');
+      pages.push(lines.join('\n'));
+    } else {
+      pages.push(
+        items
+          .map((it: any) => (typeof it?.str === 'string' ? it.str : ''))
+          .filter(Boolean)
+          .join(' ')
+      );
+    }
   }
 
-  throw new Error(
-    `Unsupported file type "${file.name}". Please upload a JSON, PDF, DOCX, TXT, or Markdown resume.`
-  );
+  return pages.join('\n\n');
+}
+
+/** Extracts raw text from a supported file type using client-side readers. */
+export async function extractTextFromFile(
+  file: File
+): Promise<{ text: string; sourceType: 'json' | 'pdf' | 'docx' | 'text'; fileName: string }> {
+  const fileName = file.name || 'resume';
+  const lower = fileName.toLowerCase();
+
+  if (lower.endsWith('.json') || file.type === 'application/json') {
+    const text = await readAsText(file);
+    return { text, sourceType: 'json', fileName };
+  }
+
+  if (
+    lower.endsWith('.docx') ||
+    file.type ===
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+    file.type.includes('wordprocessingml')
+  ) {
+    const buffer = await file.arrayBuffer();
+    const text = await extractDocxText(buffer);
+    return { text, sourceType: 'docx', fileName };
+  }
+
+  if (lower.endsWith('.pdf') || file.type === 'application/pdf') {
+    const buffer = await file.arrayBuffer();
+    const text = await extractPdfText(buffer);
+    return { text, sourceType: 'pdf', fileName };
+  }
+
+  if (
+    lower.endsWith('.txt') ||
+    lower.endsWith('.md') ||
+    lower.endsWith('.csv') ||
+    file.type.startsWith('text/') ||
+    !file.type
+  ) {
+    const text = await readAsText(file);
+    return { text, sourceType: 'text', fileName };
+  }
+
+  if (
+    lower.endsWith('.exe') ||
+    lower.endsWith('.bin') ||
+    file.type.startsWith('application/x-msdownload') ||
+    file.type.startsWith('application/x-')
+  ) {
+    throw new Error(
+      `Unsupported file type "${fileName}". Please upload a JSON, PDF, DOCX, TXT, or Markdown resume.`
+    );
+  }
+
+  const text = await readAsText(file);
+  return { text, sourceType: 'text', fileName };
 }
 
 /** Ingests an uploaded file, dispatching to JSON-Resume or plain-text parsing. */
 export async function parseImportedFile(file: File): Promise<ParsedFileResult> {
-  const rawText = await extractTextFromFile(file);
-  const lower = file.name.toLowerCase();
-  const sourceType: ImportSourceType = lower.endsWith('.json')
-    ? 'json'
-    : lower.endsWith('.pdf')
-    ? 'pdf'
-    : lower.endsWith('.docx')
-    ? 'docx'
-    : 'text';
+  const { text: rawText, sourceType } = await extractTextFromFile(file);
 
   if (sourceType === 'json') {
     const data = parseJsonResumeContent(rawText);
