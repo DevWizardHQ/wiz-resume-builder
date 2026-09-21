@@ -5,6 +5,7 @@ import {
   extractPdfText,
   sanitizeAtsText,
   parseImportedFile,
+  parseEducationSection,
 } from '@/lib/import/resume-parser';
 
 vi.mock('mammoth', () => ({
@@ -165,3 +166,50 @@ Songwriting, Production, Vocals`;
     expect(result.data.experience[0].company).toBe('Big Machine Records');
   });
 });
+
+describe('Stage 2 - Advanced Education Heuristic Parsing', () => {
+  it('parses multiple single-newline separated education entries', () => {
+    const text = `B.S. in Computer Science, Stanford University, 2016-09 - 2020-06
+M.S. in Artificial Intelligence, MIT, 2020-09 - 2022-06`;
+    const items = parseEducationSection(text);
+    expect(items).toHaveLength(2);
+    expect(items[0].institution).toBe('Stanford University');
+    expect(items[0].degree).toBe('B.S.');
+    expect(items[0].fieldOfStudy).toBe('Computer Science');
+    expect(items[0].startDate).toBe('2016-09');
+    expect(items[0].endDate).toBe('2020-06');
+    expect(items[1].institution).toBe('MIT');
+    expect(items[1].degree).toBe('M.S.');
+    expect(items[1].fieldOfStudy).toBe('Artificial Intelligence');
+  });
+
+  it('parses institution-first multi-line education blocks', () => {
+    const text = `University of Oxford
+Master of Science in Mathematics
+2018 - 2020
+GPA: 3.95/4.0
+Dean's List, Distinction in Mathematics`;
+    const items = parseEducationSection(text);
+    expect(items).toHaveLength(1);
+    expect(items[0].institution).toBe('University of Oxford');
+    expect(items[0].degree).toBe('Master of Science');
+    expect(items[0].fieldOfStudy).toBe('Mathematics');
+    expect(items[0].startDate).toBe('2018');
+    expect(items[0].endDate).toBe('2020');
+    expect(items[0].gpa).toBe('3.95/4.0');
+    expect(items[0].honors).toEqual(expect.arrayContaining(["Dean's List", 'Distinction in Mathematics']));
+  });
+
+  it('parses international and vocational degree types', () => {
+    const text = `B.Tech in Information Technology
+National Institute of Technology
+2014 - 2018 | CGPA: 3.82`;
+    const items = parseEducationSection(text);
+    expect(items).toHaveLength(1);
+    expect(items[0].degree).toBe('B.Tech');
+    expect(items[0].fieldOfStudy).toBe('Information Technology');
+    expect(items[0].institution).toBe('National Institute of Technology');
+    expect(items[0].gpa).toBe('3.82');
+  });
+});
+
