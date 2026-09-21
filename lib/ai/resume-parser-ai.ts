@@ -95,6 +95,10 @@ export function extractStructuredResume(
 
   // Validate and parse via Zod schema
   const parseResult = ResumeAiSchema.safeParse(rawParsed);
+  console.log('[DEV LOG] [Stage 2] Zod schema validation result:', {
+    success: parseResult.success,
+    issues: parseResult.success ? undefined : parseResult.error.issues,
+  });
   const parsed: any = parseResult.success ? parseResult.data : rawParsed;
 
   // 1. Basics & Contact Info
@@ -398,7 +402,7 @@ export function extractStructuredResume(
       }))
     : fallback.references;
 
-  return {
+  const result: ImportedResume = {
     contact,
     summary,
     experience,
@@ -411,6 +415,11 @@ export function extractStructuredResume(
     publications,
     references,
   };
+
+  console.log('[DEV LOG] [Stage 2] extractStructuredResume result (merged over Stage 1 heuristic):');
+  console.log(JSON.stringify(result, null, 2));
+
+  return result;
 }
 
 /** Computes section presence/count metadata for the result payload. */
@@ -441,13 +450,28 @@ export async function parseResumeWithAi(
   options: AiClientOptions = {}
 ): Promise<ParseResumeResult> {
   const warnings: string[] = [];
+
+  console.log('\n[DEV LOG] ==================== RESUME PARSER START ====================');
+  console.log('[DEV LOG] Input raw resume text length:', content.length);
+
+  // Stage 1: Deterministic JS Heuristic Parsing
   const heuristic = parsePlainTextResume(content);
+  console.log('[DEV LOG] ---------- [Stage 1] JS Heuristic Parsed Resume ----------');
+  console.log(JSON.stringify(heuristic, null, 2));
 
   const config = resolveAiProviderConfig(options);
+  console.log('[DEV LOG] AI Provider Configuration:', {
+    provider: config.provider,
+    model: config.model,
+    baseUrl: config.baseUrl,
+    hasApiKey: Boolean(config.apiKey),
+  });
+
   const prompt = buildResumeParsePrompt(content);
 
   // 1. OmniRoute
   if (config.provider === 'omniroute' && config.apiKey) {
+    console.log('[DEV LOG] Dispatching request to OmniRoute...');
     const rawOutput = await callOpenAiCompatibleApi(
       config.baseUrl,
       config.apiKey,
@@ -462,8 +486,12 @@ export async function parseResumeWithAi(
       config.timeoutMs
     );
     if (rawOutput) {
+      console.log(`[DEV LOG] ---------- [Stage 2] Raw AI Response (OmniRoute / ${config.model}) ----------`);
+      console.log(rawOutput);
       const enriched = extractStructuredResume(rawOutput, heuristic);
       const data = importedResumeToData(enriched);
+      console.log('[DEV LOG] ========== [Final Normalized Resume Data Schema] ==========');
+      console.log(JSON.stringify(data, null, 2));
       return {
         data,
         source: 'ai',
@@ -477,6 +505,7 @@ export async function parseResumeWithAi(
 
   // 2. OpenAI
   if (config.provider === 'openai' && config.apiKey) {
+    console.log('[DEV LOG] Dispatching request to OpenAI...');
     const rawOutput = await callOpenAiCompatibleApi(
       config.baseUrl,
       config.apiKey,
@@ -491,8 +520,12 @@ export async function parseResumeWithAi(
       config.timeoutMs
     );
     if (rawOutput) {
+      console.log(`[DEV LOG] ---------- [Stage 2] Raw AI Response (OpenAI / ${config.model}) ----------`);
+      console.log(rawOutput);
       const enriched = extractStructuredResume(rawOutput, heuristic);
       const data = importedResumeToData(enriched);
+      console.log('[DEV LOG] ========== [Final Normalized Resume Data Schema] ==========');
+      console.log(JSON.stringify(data, null, 2));
       return {
         data,
         source: 'ai',
@@ -506,6 +539,7 @@ export async function parseResumeWithAi(
 
   // 3. Local Ollama
   if (config.provider === 'ollama') {
+    console.log('[DEV LOG] Dispatching request to local Ollama...');
     const rawOutput = await callOllamaGenerateApi(
       config.baseUrl,
       config.model,
@@ -513,9 +547,13 @@ export async function parseResumeWithAi(
       config.timeoutMs
     );
     if (rawOutput) {
+      console.log(`[DEV LOG] ---------- [Stage 2] Raw AI Response (Ollama / ${config.model}) ----------`);
+      console.log(rawOutput);
       const enriched = extractStructuredResume(rawOutput, heuristic);
       const data = importedResumeToData(enriched);
       if (data.contact.fullName || data.experience.length > 0 || data.skills.length > 0) {
+        console.log('[DEV LOG] ========== [Final Normalized Resume Data Schema] ==========');
+        console.log(JSON.stringify(data, null, 2));
         return {
           data,
           source: 'ai',
@@ -529,7 +567,10 @@ export async function parseResumeWithAi(
   }
 
   // 4. Deterministic fallback
+  console.log('[DEV LOG] [Fallback] Using Stage 1 deterministic JS heuristic parsed resume data');
   const fallbackData = importedResumeToData(heuristic);
+  console.log('[DEV LOG] ========== [Final Resume Data Schema (Heuristic Fallback)] ==========');
+  console.log(JSON.stringify(fallbackData, null, 2));
   return {
     data: fallbackData,
     source: 'heuristic',

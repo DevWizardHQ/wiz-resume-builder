@@ -79,10 +79,17 @@ export const ImportResumeDialog: React.FC<ImportResumeDialogProps> = ({
     try {
       const extracted = await extractTextFromFile(file);
       setPastedText('');
+      console.log('[DEV LOG] [Client: ImportResumeDialog] File text extracted by JS:', {
+        fileName: file.name,
+        sourceType: extracted.sourceType,
+        textLength: extracted.text.length,
+        preview: extracted.text.slice(0, 200),
+      });
 
       if (extracted.sourceType === 'json') {
         const jsonData = parseJsonResumeContent(extracted.text);
         if (jsonData) {
+          console.log('[DEV LOG] [Client: ImportResumeDialog] Parsed JSON Resume directly:', jsonData);
           setParsed(jsonData);
           setSource('json');
           setTitle(formatTitle(jsonData.contact?.fullName, file.name));
@@ -92,6 +99,7 @@ export const ImportResumeDialog: React.FC<ImportResumeDialogProps> = ({
 
       // Stage 2: AI schema fitting with heuristic fallback
       try {
+        console.log('[DEV LOG] [Client: ImportResumeDialog] Requesting AI Resume Parse from API...');
         const res = await fetch('/api/ai/parse-resume', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -105,22 +113,28 @@ export const ImportResumeDialog: React.FC<ImportResumeDialogProps> = ({
 
         if (res.ok) {
           const result = await res.json();
+          console.log('[DEV LOG] [Client: ImportResumeDialog] Received parsed resume data schema from API:', result);
           setParsed(result.data);
           setSource(result.source || 'heuristic');
           setTitle(formatTitle(result.data?.contact?.fullName, file.name));
         } else {
+          console.warn('[DEV LOG] [Client: ImportResumeDialog] API parse failed, using client-side heuristic fallback');
           const fallbackData = parseTextResumeContent(extracted.text);
+          console.log('[DEV LOG] [Client: ImportResumeDialog] Client-side heuristic parsed data schema:', fallbackData);
           setParsed(fallbackData);
           setSource('heuristic');
           setTitle(formatTitle(fallbackData.contact?.fullName, file.name));
         }
-      } catch {
+      } catch (apiErr) {
+        console.warn('[DEV LOG] [Client: ImportResumeDialog] API fetch error, using client-side heuristic fallback:', apiErr);
         const fallbackData = parseTextResumeContent(extracted.text);
+        console.log('[DEV LOG] [Client: ImportResumeDialog] Client-side heuristic parsed data schema:', fallbackData);
         setParsed(fallbackData);
         setSource('heuristic');
         setTitle(formatTitle(fallbackData.contact?.fullName, file.name));
       }
     } catch (err: any) {
+      console.error('[DEV LOG] [Client: ImportResumeDialog] Error extracting file:', err);
       setError(err?.message || 'Failed to read the uploaded file.');
     } finally {
       setIsParsing(false);
@@ -137,14 +151,17 @@ export const ImportResumeDialog: React.FC<ImportResumeDialogProps> = ({
       return;
     }
     setIsParsing(true);
+    console.log('[DEV LOG] [Client: ImportResumeDialog] Parsing pasted text. Length:', trimmed.length);
     try {
       const jsonData = parseJsonResumeContent(trimmed);
       if (jsonData) {
+        console.log('[DEV LOG] [Client: ImportResumeDialog] Parsed JSON Resume directly from paste:', jsonData);
         setParsed(jsonData);
         setSource('json');
         setTitle(jsonData.contact.fullName ? `${jsonData.contact.fullName} — Resume` : 'Imported Resume');
         return;
       }
+      console.log('[DEV LOG] [Client: ImportResumeDialog] Requesting AI Resume Parse for pasted text...');
       const res = await fetch('/api/ai/parse-resume', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -152,17 +169,22 @@ export const ImportResumeDialog: React.FC<ImportResumeDialogProps> = ({
       });
       if (res.ok) {
         const result = await res.json();
+        console.log('[DEV LOG] [Client: ImportResumeDialog] Received parsed resume data schema from API:', result);
         setParsed(result.data);
         setSource(result.source || 'heuristic');
         setTitle(result.data?.contact?.fullName ? `${result.data.contact.fullName} — Resume` : 'Imported Resume');
       } else {
+        console.warn('[DEV LOG] [Client: ImportResumeDialog] API parse failed, using client-side heuristic fallback');
         const fallbackData = parseTextResumeContent(trimmed);
+        console.log('[DEV LOG] [Client: ImportResumeDialog] Client-side heuristic parsed data schema:', fallbackData);
         setParsed(fallbackData);
         setSource('heuristic');
         setTitle(fallbackData.contact.fullName ? `${fallbackData.contact.fullName} — Resume` : 'Imported Resume');
       }
-    } catch {
+    } catch (apiErr) {
+      console.warn('[DEV LOG] [Client: ImportResumeDialog] API fetch error, using client-side heuristic fallback:', apiErr);
       const fallbackData = parseTextResumeContent(trimmed);
+      console.log('[DEV LOG] [Client: ImportResumeDialog] Client-side heuristic parsed data schema:', fallbackData);
       setParsed(fallbackData);
       setSource('heuristic');
       setTitle(fallbackData.contact.fullName ? `${fallbackData.contact.fullName} — Resume` : 'Imported Resume');
