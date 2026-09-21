@@ -879,19 +879,60 @@ export function jsonResumeToImported(raw: unknown): ImportedResume {
         .filter((e) => e && typeof e === 'object')
         .map((e, idx) => {
           const obj = e as Record<string, unknown>;
+          const institution =
+            toStringOrEmpty(obj.institution).trim() ||
+            toStringOrEmpty(obj.school).trim() ||
+            toStringOrEmpty(obj.university).trim() ||
+            toStringOrEmpty(obj.college).trim() ||
+            toStringOrEmpty(obj.academy).trim() ||
+            toStringOrEmpty(obj.name).trim();
+
+          const degree =
+            toStringOrEmpty(obj.studyType).trim() ||
+            toStringOrEmpty(obj.degree).trim() ||
+            toStringOrEmpty(obj.qualification).trim() ||
+            toStringOrEmpty(obj.diploma).trim() ||
+            toStringOrEmpty(obj.certificate).trim();
+
+          const fieldOfStudy =
+            toStringOrEmpty(obj.area).trim() ||
+            toStringOrEmpty(obj.fieldOfStudy).trim() ||
+            toStringOrEmpty(obj.major).trim() ||
+            toStringOrEmpty(obj.discipline).trim() ||
+            toStringOrEmpty(obj.subject).trim() ||
+            toStringOrEmpty(obj.branch).trim();
+
+          const rawGpa =
+            obj.gpa !== undefined && obj.gpa !== null
+              ? toStringOrEmpty(obj.gpa).trim()
+              : obj.score !== undefined && obj.score !== null
+                ? toStringOrEmpty(obj.score).trim()
+                : obj.cgpa !== undefined && obj.cgpa !== null
+                  ? toStringOrEmpty(obj.cgpa).trim()
+                  : obj.grade !== undefined && obj.grade !== null
+                    ? toStringOrEmpty(obj.grade).trim()
+                    : undefined;
+
+          let honorsList: string[] | undefined = undefined;
+          if (Array.isArray(obj.honors)) {
+            honorsList = (obj.honors as unknown[])
+              .map((h) => toStringOrEmpty(h).trim())
+              .filter(Boolean);
+          } else if (typeof obj.honors === 'string' && obj.honors.trim()) {
+            honorsList = [obj.honors.trim()];
+          }
+
           return {
             id: genId('edu'),
             visible: true,
             order: idx,
-            institution: toStringOrEmpty(obj.institution).trim(),
-            degree: toStringOrEmpty(obj.studyType).trim(),
-            fieldOfStudy: toStringOrEmpty(obj.area).trim(),
+            institution: institution || 'Unknown Institution',
+            degree,
+            fieldOfStudy,
             startDate: normalizeDate(toStringOrEmpty(obj.startDate)),
             endDate: normalizeDate(toStringOrEmpty(obj.endDate)),
-            gpa:
-              obj.gpa !== undefined && obj.gpa !== null
-                ? toStringOrEmpty(obj.gpa).trim() || undefined
-                : undefined,
+            gpa: rawGpa || undefined,
+            honors: honorsList && honorsList.length > 0 ? honorsList : undefined,
           };
         })
     : [];
