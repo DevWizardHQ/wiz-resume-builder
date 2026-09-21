@@ -150,6 +150,48 @@ describe('JSON Resume standard import', () => {
     expect(data!.experience).toEqual([]);
     expect(data!.summary.text).toBe('');
   });
+
+  it('maps education fields from diverse JSON Resume aliases and formats', () => {
+    const customJson = JSON.stringify({
+      basics: { name: 'Edu Tester' },
+      education: [
+        {
+          school: 'UC Berkeley',
+          degree: 'Bachelor of Arts',
+          major: 'Computer Science',
+          startDate: '2015-08',
+          endDate: '2019-05',
+          cgpa: '3.92',
+          honors: ['Honors in Computer Science', 'Summa Cum Laude'],
+        },
+        {
+          university: 'Oxford University',
+          studyType: 'M.Sc.',
+          area: 'Data Science',
+          startDate: '2019-10',
+          endDate: '2020-09',
+          score: '3.98',
+          honors: 'Distinction',
+        },
+      ],
+    });
+
+    const parsed = parseJsonResumeContent(customJson);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.education).toHaveLength(2);
+
+    expect(parsed!.education[0].institution).toBe('UC Berkeley');
+    expect(parsed!.education[0].degree).toBe('Bachelor of Arts');
+    expect(parsed!.education[0].fieldOfStudy).toBe('Computer Science');
+    expect(parsed!.education[0].gpa).toBe('3.92');
+    expect(parsed!.education[0].honors).toEqual(['Honors in Computer Science', 'Summa Cum Laude']);
+
+    expect(parsed!.education[1].institution).toBe('Oxford University');
+    expect(parsed!.education[1].degree).toBe('M.Sc.');
+    expect(parsed!.education[1].fieldOfStudy).toBe('Data Science');
+    expect(parsed!.education[1].gpa).toBe('3.98');
+    expect(parsed!.education[1].honors).toEqual(['Distinction']);
+  });
 });
 
 const PLAIN_TEXT = `Jane Doe
