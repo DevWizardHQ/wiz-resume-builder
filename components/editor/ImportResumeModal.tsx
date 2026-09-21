@@ -70,10 +70,17 @@ export const ImportResumeModal: React.FC<ImportResumeModalProps> = ({
     try {
       const extracted = await extractTextFromFile(file);
       setPastedText('');
+      console.log('[DEV LOG] [Client: ImportResumeModal] File text extracted by JS:', {
+        fileName: file.name,
+        sourceType: extracted.sourceType,
+        textLength: extracted.text.length,
+        preview: extracted.text.slice(0, 200),
+      });
 
       if (extracted.sourceType === 'json') {
         const jsonData = parseJsonResumeContent(extracted.text);
         if (jsonData) {
+          console.log('[DEV LOG] [Client: ImportResumeModal] Parsed JSON Resume directly:', jsonData);
           setParsed(jsonData);
           setSource('json');
           return;
@@ -82,6 +89,7 @@ export const ImportResumeModal: React.FC<ImportResumeModalProps> = ({
 
       // Stage 2: AI schema fitting with heuristic fallback
       try {
+        console.log('[DEV LOG] [Client: ImportResumeModal] Requesting AI Resume Parse from API...');
         const res = await fetch('/api/ai/parse-resume', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -95,17 +103,25 @@ export const ImportResumeModal: React.FC<ImportResumeModalProps> = ({
 
         if (res.ok) {
           const result = await res.json();
+          console.log('[DEV LOG] [Client: ImportResumeModal] Received parsed resume data schema from API:', result);
           setParsed(result.data);
           setSource(result.source || 'heuristic');
         } else {
-          setParsed(parseTextResumeContent(extracted.text));
+          console.warn('[DEV LOG] [Client: ImportResumeModal] API parse failed, using client-side heuristic fallback');
+          const fallbackData = parseTextResumeContent(extracted.text);
+          console.log('[DEV LOG] [Client: ImportResumeModal] Client-side heuristic parsed data schema:', fallbackData);
+          setParsed(fallbackData);
           setSource('heuristic');
         }
-      } catch {
-        setParsed(parseTextResumeContent(extracted.text));
+      } catch (apiErr) {
+        console.warn('[DEV LOG] [Client: ImportResumeModal] API fetch error, using client-side heuristic fallback:', apiErr);
+        const fallbackData = parseTextResumeContent(extracted.text);
+        console.log('[DEV LOG] [Client: ImportResumeModal] Client-side heuristic parsed data schema:', fallbackData);
+        setParsed(fallbackData);
         setSource('heuristic');
       }
     } catch (err: any) {
+      console.error('[DEV LOG] [Client: ImportResumeModal] Error extracting file:', err);
       setError(err?.message || 'Failed to read the uploaded file.');
     } finally {
       setIsParsing(false);
@@ -122,14 +138,17 @@ export const ImportResumeModal: React.FC<ImportResumeModalProps> = ({
       return;
     }
     setIsParsing(true);
+    console.log('[DEV LOG] [Client: ImportResumeModal] Parsing pasted text. Length:', trimmed.length);
     try {
       const jsonData = parseJsonResumeContent(trimmed);
       if (jsonData) {
+        console.log('[DEV LOG] [Client: ImportResumeModal] Parsed JSON Resume directly from paste:', jsonData);
         setParsed(jsonData);
         setSource('json');
         return;
       }
       // Try AI-assisted parse for richer extraction, falling back to heuristics.
+      console.log('[DEV LOG] [Client: ImportResumeModal] Requesting AI Resume Parse for pasted text...');
       const res = await fetch('/api/ai/parse-resume', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -137,15 +156,21 @@ export const ImportResumeModal: React.FC<ImportResumeModalProps> = ({
       });
       if (res.ok) {
         const result = await res.json();
+        console.log('[DEV LOG] [Client: ImportResumeModal] Received parsed resume data schema from API:', result);
         setParsed(result.data);
         setSource(result.source || 'heuristic');
       } else {
-        // Offline-safe fallback
-        setParsed(parseTextResumeContent(trimmed));
+        console.warn('[DEV LOG] [Client: ImportResumeModal] API parse failed, using client-side heuristic fallback');
+        const fallbackData = parseTextResumeContent(trimmed);
+        console.log('[DEV LOG] [Client: ImportResumeModal] Client-side heuristic parsed data schema:', fallbackData);
+        setParsed(fallbackData);
         setSource('heuristic');
       }
-    } catch {
-      setParsed(parseTextResumeContent(trimmed));
+    } catch (apiErr) {
+      console.warn('[DEV LOG] [Client: ImportResumeModal] API fetch error, using client-side heuristic fallback:', apiErr);
+      const fallbackData = parseTextResumeContent(trimmed);
+      console.log('[DEV LOG] [Client: ImportResumeModal] Client-side heuristic parsed data schema:', fallbackData);
+      setParsed(fallbackData);
       setSource('heuristic');
     } finally {
       setIsParsing(false);
