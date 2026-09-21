@@ -408,46 +408,192 @@ export function parseExperienceSection(text: string): ExperienceItem[] {
   return items;
 }
 
+const DEGREE_REGEX =
+  /(?:B\.?S\.?c?\.?|B\.?A\.?|B\.?Tech\.?|B\.?E\.?|B\.?Eng\.?|B\.?Com\.?|B\.?B\.?A\.?|BBA|BCA|B\.?Ed\.?|Bachelor(?:'s)?(?: of [A-Za-z &]+)?|M\.?S\.?c?\.?|M\.?A\.?|M\.?B\.?A\.?|M\.?Tech\.?|M\.?E\.?|M\.?Eng\.?|M\.?Phil\.?|MCA|M\.?Ed\.?|Master(?:'s)?(?: of [A-Za-z &]+)?|P\.?h\.?D\.?|Doctor(?: of Philosophy)?|Doctorate|Associate(?:'s)?(?: of [A-Za-z &]+)?|Associate Degree|A\.?A\.?|A\.?S\.?|Postgraduate Diploma|PG Diploma|Advanced Diploma|Diploma|High School Diploma|Higher Secondary|Secondary School Certificate|SSC|HSC|A-Levels|O-Levels|International Baccalaureate|IB Diploma|Matriculation|GED)(?=\s|$|,|:|\))/i;
+
+const INSTITUTION_KEYWORD_REGEX =
+  /(?:University|College|Institute|School|Academy|Polytechnic|Conservatory|Faculty|Campus|MIT|Stanford|Harvard|Oxford|Cambridge|Berkeley|UCLA|NIT|IIT)\b/i;
+
+function extractHonorsFromText(text: string): string[] | undefined {
+  const honorsList: string[] = [];
+  const honorsRegex =
+    /(?:Dean'?s\s+(?:List|Honor\s+Roll)|President'?s\s+List|Chancellor'?s\s+List|(?:Summa\s+|Magna\s+)?Cum\s+Laude|Distinction(?:\s+in\s+[A-Za-z &]+)?|Honors(?:\s+in\s+[A-Za-z &]+)?|First\s+Class(?:\s+with\s+Distinction|\s+Honours)?|Valedictorian|Salutatorian|Academic\s+Excellence)/gi;
+
+  const matches = text.match(honorsRegex);
+  if (matches) {
+    matches.forEach((m) => {
+      const trimmed = m.trim();
+      if (trimmed && !honorsList.includes(trimmed)) {
+        honorsList.push(trimmed);
+      }
+    });
+  }
+  return honorsList.length > 0 ? honorsList : undefined;
+}
+
+function extractDegreeAndMajor(str: string): { degree: string; fieldOfStudy: string } {
+  const cleaned = str.trim();
+
+  const majorPatterns = [
+    /\s+(?:in|major(?:\s+in|:)?|concentration(?:\s+in)?)\s+(.+)$/i,
+    /\s*[-–—|]\s*(.+)$/,
+  ];
+
+  for (const pat of majorPatterns) {
+    const match = cleaned.match(pat);
+    if (match && match.index !== undefined) {
+      const majorPart = match[1].trim();
+      const degPart = cleaned.slice(0, match.index).trim();
+      if (degPart) {
+        const degMatch = degPart.match(DEGREE_REGEX);
+        if (degMatch) {
+          return {
+            degree: degMatch[0].trim(),
+            fieldOfStudy: majorPart.replace(/^(?:in|major(?:\s+in|:)?|concentration(?:\s+in)?)\s+/i, '').trim(),
+          };
+        }
+      }
+    }
+  }
+
+  const degMatch = cleaned.match(DEGREE_REGEX);
+  if (degMatch) {
+    const deg = degMatch[0].trim();
+    let rest = cleaned.replace(degMatch[0], '').trim();
+    rest = rest.replace(/^(?:in\s+|,|-|–|—|:)\s*/i, '').trim();
+    return {
+      degree: deg,
+      fieldOfStudy: rest,
+    };
+  }
+
+  return { degree: '', fieldOfStudy: '' };
+}
+
+function chunkEducationLines(text: string): string[][] {
+  const rawLines = text.split(/\r?\n/);
+  const chunks: string[][] = [];
+  let currentChunk: string[] = [];
+
+  for (const rawLine of rawLines) {
+    const line = rawLine.trim();
+    if (!line) {
+      if (currentChunk.length > 0) {
+        chunks.push(currentChunk);
+        currentChunk = [];
+      }
+      continue;
+    }
+
+    if (currentChunk.length > 0) {
+      const currentChunkText = currentChunk.join(' ');
+      const currentHasDegree = DEGREE_REGEX.test(currentChunkText);
+      const currentHasInstitution =
+        INSTITUTION_KEYWORD_REGEX.test(currentChunkText) || currentChunk.length >= 2;
+      const currentHasDate = /(?:19|20)\d{2}/.test(currentChunkText);
+
+      const lineHasDegree = DEGREE_REGEX.test(line);
+      const lineHasInstitution = INSTITUTION_KEYWORD_REGEX.test(line);
+
+      const startsWithNewDegree = lineHasDegree && currentHasDegree;
+      const currentIsComplete = currentHasDegree && (currentHasInstitution || currentHasDate);
+
+      if (startsWithNewDegree || (currentIsComplete && (lineHasDegree || lineHasInstitution))) {
+        chunks.push(currentChunk);
+        currentChunk = [];
+      }
+    }
+
+    currentChunk.push(line);
+  }
+
+  if (currentChunk.length > 0) {
+    chunks.push(currentChunk);
+  }
+
+  return chunks;
+}
+
 /** Parses an education section into EducationItem entries. */
 export function parseEducationSection(text: string): EducationItem[] {
-  const paragraphs = text.split(/\r?\n\s*\r?\n/);
+  const chunks = chunkEducationLines(text);
   const items: EducationItem[] = [];
 
-  paragraphs.forEach((para, idx) => {
-    const lines = para.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-    if (lines.length === 0) return;
-    const header = lines[0];
-    const body = lines.slice(1).join(' ');
+  chunks.forEach((chunk, idx) => {
+    if (chunk.length === 0) return;
+
+    const fullChunk = chunk.join(' ');
+
+    const dateRangeMatch = fullChunk.match(
+      /((?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*[\s,]+)?(?:19|20)\d{2}(?:-\d{2})?)\s*(?:-|–|—|to)\s*((?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*[\s,]+)?(?:19|20)\d{2}(?:-\d{2})?|Present|Current|Now)/i
+    );
+    let startDate = '';
+    let endDate = '';
+    if (dateRangeMatch) {
+      startDate = normalizeDate(dateRangeMatch[1]);
+      endDate = /present|current|now/i.test(dateRangeMatch[2]) ? 'Present' : normalizeDate(dateRangeMatch[2]);
+    } else {
+      const singleDateMatch = fullChunk.match(/\b((?:19|20)\d{2}(?:-\d{2})?)\b/);
+      if (singleDateMatch) {
+        startDate = normalizeDate(singleDateMatch[1]);
+      }
+    }
+
+    const gpaMatch =
+      fullChunk.match(/(?:(?:Cumulative\s+)?(?:C?GPA|Grade|Score)[\s:]+)([0-9]\.[0-9]{1,2}(?:\s*\/\s*[0-9]\.[0-9]{1,2})?)/i) ||
+      fullChunk.match(/\b([0-4]\.[0-9]{1,2}\s*\/\s*[0-4]\.[0-9]{1,2})\b/) ||
+      fullChunk.match(/(?:GPA|CGPA)[:\s]+([\d.]+)/i);
+    const gpa = gpaMatch ? gpaMatch[1].replace(/\s+/g, '') : undefined;
+
+    const honors = extractHonorsFromText(fullChunk);
 
     let degree = '';
     let fieldOfStudy = '';
     let institution = '';
 
-    const degreeMatch = header.match(
-      /(B\.?S\.?|B\.?A\.?|M\.?S\.?|M\.?B\.?A\.?|M\.?A\.?|P\.?h\.?D\.?|Bachelor(?: of [A-Za-z]+)?|Master(?: of [A-Za-z]+)?|Doctor|High School|Associate)(?=\s|$|,)/i
-    );
+    if (chunk.length === 1) {
+      const parts = chunk[0].split(/,|\|/).map((p) => p.trim()).filter(Boolean);
+      for (const part of parts) {
+        const isDatePart = /^(?:(?:19|20)\d{2}|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i.test(part);
+        const isGpaPart = /^(?:GPA|CGPA|Grade|Score)/i.test(part);
+        if (isDatePart || isGpaPart) continue;
 
-    if (degreeMatch) {
-      degree = degreeMatch[1];
-      const rest = header.replace(degreeMatch[0], '').trim();
-      const parts = rest.split(',').map((p) => p.trim()).filter(Boolean);
-      if (parts.length >= 2) {
-        fieldOfStudy = parts[0];
-        institution = parts[1];
-      } else if (parts.length === 1) {
-        // e.g. "Computer Science, MIT" or "MIT"
-        institution = parts[0];
+        if (!degree && DEGREE_REGEX.test(part)) {
+          const extracted = extractDegreeAndMajor(part);
+          degree = extracted.degree;
+          if (extracted.fieldOfStudy) fieldOfStudy = extracted.fieldOfStudy;
+        } else if (!institution) {
+          institution = part
+            .replace(/(?:(?:19|20)\d{2}.*)/, '')
+            .replace(/(?:GPA|CGPA|Grade).*$/i, '')
+            .trim();
+        } else if (!fieldOfStudy) {
+          fieldOfStudy = part;
+        }
       }
     } else {
-      institution = header;
-    }
+      for (const line of chunk) {
+        const isPureDate = /^(?:(?:19|20)\d{2}(?:-\d{2})?[\s.-]*(?:-|–|—|to)?[\s.]*(?:(?:19|20)\d{2}(?:-\d{2})?|Present|Current)?)$/i.test(line);
+        const isGpaLine = /^(?:GPA|CGPA|Grade|Score)/i.test(line);
+        const isHonorsLine = /^(?:Dean'?s|President'?s|Chancellor'?s|Cum Laude|Magna|Summa|Distinction|Honors|First Class)/i.test(line);
+        if (isPureDate || isGpaLine || isHonorsLine) continue;
 
-    const fullContent = header + ' ' + body;
-    const dateMatch = fullContent.match(
-      /((?:19|20)\d{2}(?:-\d{2})?)[\s.-]*(?:-|–)?[\s.]*((?:19|20)\d{2}(?:-\d{2})?)/
-    );
-    const gpaMatch = fullContent.match(/GPA:?\s*([\d.]+)/i) || fullContent.match(/([\d]\.[\d]{1,2})/);
-    const honorsMatch = fullContent.match(/([A-Z][a-z]+(?:s)?(?: of)?(?: the)? [A-Z][a-z]+(?:\s+List)?)/g);
+        if (!degree && DEGREE_REGEX.test(line)) {
+          const extracted = extractDegreeAndMajor(line);
+          degree = extracted.degree;
+          if (extracted.fieldOfStudy) fieldOfStudy = extracted.fieldOfStudy;
+        } else if (!institution) {
+          const instCandidate = line
+            .replace(/(?:(?:19|20)\d{2}.*)/, '')
+            .replace(/(?:GPA|CGPA|Grade).*$/i, '')
+            .replace(/\|.*$/, '')
+            .trim();
+          if (instCandidate) institution = instCandidate;
+        } else if (!fieldOfStudy) {
+          fieldOfStudy = line.trim();
+        }
+      }
+    }
 
     items.push({
       id: genId('edu'),
@@ -456,10 +602,10 @@ export function parseEducationSection(text: string): EducationItem[] {
       institution: institution || 'Unknown Institution',
       degree,
       fieldOfStudy,
-      startDate: normalizeDate(dateMatch?.[1]),
-      endDate: normalizeDate(dateMatch?.[2]),
-      gpa: gpaMatch?.[1],
-      honors: honorsMatch || undefined,
+      startDate,
+      endDate,
+      gpa,
+      honors,
     });
   });
 
