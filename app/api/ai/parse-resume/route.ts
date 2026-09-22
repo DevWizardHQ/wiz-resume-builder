@@ -17,6 +17,8 @@ export async function POST(request: NextRequest) {
 
     const sourceType = body.sourceType || detectSourceType(content, body.fileName);
     console.log(`[DEV LOG] [API /api/ai/parse-resume] Received request. SourceType: ${sourceType}, File: ${body.fileName || 'N/A'}, Content length: ${content.length}`);
+    console.log('[DEV LOG] [API /api/ai/parse-resume] ---------- [Raw Text Extract] Full Content ----------');
+    console.log(content);
 
     // JSON Resume short-circuits (no LLM needed for well-formed standard data).
     if (sourceType === 'json') {
