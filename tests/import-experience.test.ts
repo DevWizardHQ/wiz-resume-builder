@@ -48,4 +48,34 @@ WizTech Corp San Francisco, CA
     expect(items[0].startDate).toBe('2022-01');
     expect(items[0].endDate).toBe('2024-03');
   });
+
+  it('stitches wrapped multiline bullet points into single bullets without fragmenting jobs', () => {
+    const text = `Software Engineer Jan 2024 - Present
+Devzar Dhaka, Bangladesh
+• Engineered a distributed task processing pipeline using Redis and Node.js
+  that handled over 2 million background jobs daily with 99.99% uptime.
+• Architected real-time WebSocket communication layer
+  reducing connection latency by 35%.
+Technologies: Node.js, Redis, TypeScript, Docker`;
+
+    const items = parseExperienceSection(text);
+    expect(items).toHaveLength(1);
+    expect(items[0].role).toBe('Software Engineer');
+    expect(items[0].company).toBe('Devzar');
+    expect(items[0].location).toBe('Dhaka, Bangladesh');
+    expect(items[0].bullets).toHaveLength(2);
+    expect(items[0].bullets[0]).toContain('2 million background jobs daily');
+    expect(items[0].bullets[1]).toContain('reducing connection latency by 35%');
+  });
+
+  it('correctly separates suffix-less company names from trailing city, country locations', () => {
+    const text = `Full Stack Developer 2022 - 2024
+Devzar Dhaka, Bangladesh (On-site)
+• Developed responsive web applications using Next.js and Tailwind CSS.`;
+
+    const items = parseExperienceSection(text);
+    expect(items).toHaveLength(1);
+    expect(items[0].company).toBe('Devzar');
+    expect(items[0].location).toContain('Dhaka, Bangladesh');
+  });
 });
