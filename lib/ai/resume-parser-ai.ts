@@ -452,7 +452,9 @@ export async function parseResumeWithAi(
   const warnings: string[] = [];
 
   console.log('\n[DEV LOG] ==================== RESUME PARSER START ====================');
-  console.log('[DEV LOG] Input raw resume text length:', content.length);
+  console.log('[DEV LOG] [Raw Text Extract] Input raw resume text length:', content.length);
+  console.log('[DEV LOG] ---------- [Raw Text Extract] Full Content ----------');
+  console.log(content);
 
   // Stage 1: Deterministic JS Heuristic Parsing
   const heuristic = parsePlainTextResume(content);
