@@ -1,7 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import type { User } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/client';
 import {
   ArrowRight,
   Bot,
@@ -34,6 +36,26 @@ import { getAppHost } from '@/lib/utils';
 
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState<'classic-ats' | 'modern-minimal' | 'executive'>('classic-ats');
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user);
+    }).catch(() => {
+      setUser(null);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col selection:bg-primary/20">
@@ -71,17 +93,28 @@ export default function HomePage() {
           </nav>
 
           <div className="flex items-center gap-3">
-            <Link href="/login" className="hidden sm:inline-block">
-              <Button variant="ghost" size="sm" className="font-medium text-sm">
-                Sign In
-              </Button>
-            </Link>
-            <Link href="/dashboard">
-              <Button size="sm" className="gap-1.5 font-medium shadow-sm">
-                <span>Go to Dashboard</span>
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Button>
-            </Link>
+            {user ? (
+              <Link href="/dashboard">
+                <Button size="sm" className="gap-1.5 font-medium shadow-sm">
+                  <span>Go to Dashboard</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Button>
+              </Link>
+            ) : (
+              <>
+                <Link href="/login" className="hidden sm:inline-block">
+                  <Button variant="ghost" size="sm" className="font-medium text-sm">
+                    Sign In
+                  </Button>
+                </Link>
+                <Link href="/signup">
+                  <Button size="sm" className="gap-1.5 font-medium shadow-sm">
+                    <span>Get Started</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -474,9 +507,15 @@ export default function HomePage() {
             <Link href="/cover-letters" className="hover:text-foreground transition-colors">
               Cover Letters
             </Link>
-            <Link href="/login" className="hover:text-foreground transition-colors">
-              Sign In
-            </Link>
+            {user ? (
+              <Link href="/dashboard" className="hover:text-foreground transition-colors">
+                My Account
+              </Link>
+            ) : (
+              <Link href="/login" className="hover:text-foreground transition-colors">
+                Sign In
+              </Link>
+            )}
           </div>
         </div>
       </footer>
