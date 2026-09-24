@@ -1,11 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["@react-pdf/renderer", "pdfkit"],
+  serverExternalPackages: ["@react-pdf/renderer"],
   outputFileTracingIncludes: {
-    "/api/export/pdf/[id]/route": [
-      "./node_modules/pdfkit/js/standard-fonts/**",
-      "./node_modules/.pnpm/pdfkit@*/node_modules/pdfkit/js/standard-fonts/**",
+    "/api/export/pdf/[id]": [
+      "./node_modules/pdfkit/js/standard-fonts/**/*",
     ],
   },
 };
