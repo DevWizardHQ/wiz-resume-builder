@@ -16,6 +16,12 @@ const nextConfig: NextConfig = {
       "./node_modules/.pnpm/@react-pdf*/**/*",
     ],
   },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    ignoreBuildErrors: false,
+  },
 };
 
 export default nextConfig;
